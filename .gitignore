@@ -1,0 +1,4 @@
+firmware/build/
+python/.venv/
+temp/
+*.pyc

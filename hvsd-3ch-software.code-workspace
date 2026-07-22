@@ -1,0 +1,163 @@
+{
+	"extensions": {
+		"recommendations": [
+		  "ms-vscode.cpptools",
+		  "ms-vscode.cmake-tools",
+		  "marus25.cortex-debug",
+		  "dan-c-underwood.arm",
+		  "zixuanwang.linkerscript",
+		  "ms-python.python",
+		  "ms-python.vscode-pylance",
+		  "ms-python.vscode-python-debugger",
+		]
+	},
+
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"type": "cppbuild",
+				"label": "Build project",
+				"command": "cmake",
+				"args": ["--build", "${command:cmake.buildDirectory}", "-j", "8"],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": ["$gcc"],
+				"group": {
+					"kind": "build",
+					"isDefault": true
+				}
+			},
+			{
+				"type": "shell",
+				"label": "Re-build project",
+				"command": "cmake",
+				"args": ["--build", "${command:cmake.buildDirectory}", "--clean-first", "-v", "-j", "8"],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": ["$gcc"],
+			},
+			{
+				"type": "shell",
+				"label": "Clean project",
+				"command": "cmake",
+				"args": ["--build", "${command:cmake.buildDirectory}", "--target", "clean"],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": []
+			},
+			{
+				"type": "shell",
+				"label": "CubeProg: Flash project (SWD)",
+				"command": "STM32_Programmer_CLI",
+				"args": [
+					"--connect",
+					"port=swd",
+					"--download", "${workspaceFolder}/firmware/build/Debug/bootloader/bootloader.elf",
+					"--download", "${workspaceFolder}/firmware/build/Debug/core/application.elf",
+					"-hardRst"
+				],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": []
+			},
+			{
+				"type": "shell",
+				"label": "CubeProg: Flash project with defined serial number (SWD) - you must set serial number first",
+				"command": "STM32_Programmer_CLI",
+				"args": [
+					"--connect",
+					"port=swd",
+					"sn=<yourserialnumber>",
+					"--download", "${command:cmake.launchTargetPath}",
+					"-hardRst"
+				],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": []
+			},
+			{
+				"type": "shell",
+				"label": "CubeProg: List all available communication interfaces",
+				"command": "STM32_Programmer_CLI",
+				"args": [
+					"--list",
+				],
+				"options": {
+					"cwd": "${workspaceFolder}/firmware"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Create Python venv and install dependencies",
+				"type": "shell",
+				"windows": {
+					"command": "cmd",
+					"args": [
+						"/c",
+						"if not exist ${workspaceFolder}\\python\\.venv ( python -m venv ${workspaceFolder}\\python\\.venv ) && ${workspaceFolder}\\python\\.venv\\Scripts\\python -m pip install -r requirements.txt"
+					],
+					"options": {
+						"cwd": "${workspaceFolder}\\python"
+					}
+				},
+				"linux": {
+					"type": "shell",
+					"command": "./setup_venv.sh",
+					"options": { "cwd": "${workspaceFolder}/python" }
+				},
+				"problemMatcher": []
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Debug",
+				"cwd": "${workspaceFolder}/firmware",        //Path from where commands are executed
+				"type": "cortex-debug",             //Debug 
+				"executable": "${workspaceFolder}/firmware/build/Debug/bootloader/bootloader.elf",
+				"loadFiles": [
+					"${workspaceFolder}/firmware/build/Debug/bootloader/bootloader.elf",
+					"${workspaceFolder}/firmware/build/Debug/core/application.elf"
+				],
+				"symbolFiles": [
+					"${workspaceFolder}/firmware/build/Debug/bootloader/bootloader.elf",
+					"${workspaceFolder}/firmware/build/Debug/core/application.elf"
+				],
+				"request": "launch",                //Use "attach" to connect to target w/o elf download
+				"servertype": "stlink",             //Use stlink setup of cortex-M debug
+				"device": "STM32G473QE",            //MCU used
+				"interface": "swd",                 //Interface setup
+				"serialNumber": "",                 //Set ST-Link ID if you use multiple at the same time
+				"runToEntryPoint": "device::init",  //Skip bootloader main; stop after chainload in app
+				"svdFile": "firmware/STM32G473.svd",         //SVD file to see registers
+				"v1": false,
+				"showDevDebugOutput": "both",
+			}
+		]
+	},
+	"settings": {
+		"cortex-debug.variableUseNaturalFormat": true,
+		"files.associations": {
+			"cmath": "cpp",
+			"random": "cpp"
+		},
+		// st linux install in home directory is the default, change if you have it somewhere else
+		"cortex-debug.armToolchainPath.linux": "${env:HOME}/st/stm32cubeclt_1.18.0/GNU-tools-for-STM32/bin",
+		"cortex-debug.objdumpPath.linux": "${env:HOME}/st/stm32cubeclt_1.18.0/GNU-tools-for-STM32/arm-none-eabi/bin/objdump",
+		"cortex-debug.stm32cubeprogrammer.linux": "${env:HOME}/st/stm32cubeclt_1.18.0/STM32CubeProgrammer/bin"
+	}
+}

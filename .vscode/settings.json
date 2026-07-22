@@ -1,0 +1,29 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/firmware",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.compilerPath": "${env:STM32CLT_PATH}/GNU-tools-for-STM32/bin/arm-none-eabi-gcc.exe",
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.cStandard": "c11",
+    "C_Cpp.default.intelliSenseMode": "gcc-arm",
+    "C_Cpp.default.defines": [
+        "STM32G473xx",
+        "USE_HAL_DRIVER",
+        "DEBUG"
+    ],
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/firmware/drivers/CMSIS/Include",
+        "${workspaceFolder}/firmware/drivers/CMSIS/Device/ST/STM32G4xx/Include",
+        "${workspaceFolder}/firmware/generated",
+        "${workspaceFolder}/firmware/generated/registers",
+        "${workspaceFolder}/firmware/generated/messaging",
+        "${workspaceFolder}/firmware/core/inc",
+        "${workspaceFolder}/firmware/bootloader/Inc"
+    ],
+    "python-envs.pythonProjects": [
+        {
+            "path": ".",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
+}

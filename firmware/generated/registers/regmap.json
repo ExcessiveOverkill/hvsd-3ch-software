@@ -1,0 +1,146 @@
+{
+    "name": "HVSD-35/400-3",
+    "word_width": 32,
+    "min_access_words": 1,
+    "compatible_drivers": [],
+    "driver_settings": {},
+    "base_group": {
+        "name": "base_group",
+        "address_offset": 0,
+        "description": "Base group for all registers",
+        "alignment": 65536,
+        "count": 1,
+        "groups": {
+            "fan": {
+                "name": "fan",
+                "address_offset": 2,
+                "description": "",
+                "alignment": 2,
+                "count": 1,
+                "groups": {},
+                "registers": {
+                    "rpm_fbk": {
+                        "name": "rpm_fbk",
+                        "address_offset": 0,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Fan speed in RPM",
+                        "width": 16,
+                        "word_width": 32,
+                        "words_per_register": 1,
+                        "starting_bit": 0,
+                        "bit_field": {},
+                        "enum": {},
+                        "min": null,
+                        "max": null,
+                        "default": null,
+                        "unit": "",
+                        "rw": "r"
+                    },
+                    "pwm_cmd": {
+                        "name": "pwm_cmd",
+                        "address_offset": 1,
+                        "type": "unsigned",
+                        "bank_size": 1,
+                        "description": "Fan PWM command (0-100%)",
+                        "width": 8,
+                        "word_width": 32,
+                        "words_per_register": 1,
+                        "starting_bit": 0,
+                        "bit_field": {},
+                        "enum": {},
+                        "min": 0,
+                        "max": 100,
+                        "default": 0,
+                        "unit": "",
+                        "rw": "rw"
+                    }
+                }
+            },
+            "motor": {
+                "name": "motor",
+                "address_offset": 4,
+                "description": "",
+                "alignment": 2,
+                "count": 3,
+                "groups": {},
+                "registers": {
+                    "ipm_ic_temp": {
+                        "name": "ipm_ic_temp",
+                        "address_offset": 0,
+                        "type": "float",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 32,
+                        "word_width": 32,
+                        "words_per_register": 1,
+                        "starting_bit": 0,
+                        "bit_field": {},
+                        "enum": {},
+                        "min": null,
+                        "max": null,
+                        "default": null,
+                        "unit": "",
+                        "rw": "r"
+                    },
+                    "ipm_thermistor": {
+                        "name": "ipm_thermistor",
+                        "address_offset": 1,
+                        "type": "float",
+                        "bank_size": 1,
+                        "description": "",
+                        "width": 32,
+                        "word_width": 32,
+                        "words_per_register": 1,
+                        "starting_bit": 0,
+                        "bit_field": {},
+                        "enum": {},
+                        "min": null,
+                        "max": null,
+                        "default": null,
+                        "unit": "",
+                        "rw": "r"
+                    }
+                }
+            }
+        },
+        "registers": {
+            "status": {
+                "name": "status",
+                "address_offset": 0,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "",
+                "width": 8,
+                "word_width": 32,
+                "words_per_register": 1,
+                "starting_bit": 0,
+                "bit_field": {},
+                "enum": {},
+                "min": null,
+                "max": null,
+                "default": null,
+                "unit": "",
+                "rw": "r"
+            },
+            "control": {
+                "name": "control",
+                "address_offset": 1,
+                "type": "unsigned",
+                "bank_size": 1,
+                "description": "",
+                "width": 8,
+                "word_width": 32,
+                "words_per_register": 1,
+                "starting_bit": 0,
+                "bit_field": {},
+                "enum": {},
+                "min": null,
+                "max": null,
+                "default": null,
+                "unit": "",
+                "rw": "rw"
+            }
+        }
+    }
+}
