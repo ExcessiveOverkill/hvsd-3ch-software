@@ -15,8 +15,8 @@
 #endif // MSG_GET_TIME_US
 
 // --- Constants -----------------------------------------------
-constexpr uint16_t MESSAGE_COUNT = 30;
-constexpr uint16_t UNIQUE_MSG_COUNT = 14;
+constexpr uint16_t MESSAGE_COUNT = 36;
+constexpr uint16_t UNIQUE_MSG_COUNT = 18;
 
 // --- MessageId enum ------------------------------------------
 enum class MessageId : uint16_t {
@@ -29,27 +29,33 @@ enum class MessageId : uint16_t {
     MOTOR_0__IPM_THERMISTOR_OVERTEMP = 6,
     MOTOR_0__IPM_THERMISTOR_FAULT = 7,
     MOTOR_0__IPM_FAULT = 8,
-    MOTOR_1__OVERCURRENT_U = 9,
-    MOTOR_1__OVERCURRENT_V = 10,
-    MOTOR_1__OVERCURRENT_W = 11,
-    MOTOR_1__PHASE_IMBALANCE = 12,
-    MOTOR_1__IPM_IC_OVERTEMP = 13,
-    MOTOR_1__IPM_THERMISTOR_OVERTEMP = 14,
-    MOTOR_1__IPM_THERMISTOR_FAULT = 15,
-    MOTOR_1__IPM_FAULT = 16,
-    MOTOR_2__OVERCURRENT_U = 17,
-    MOTOR_2__OVERCURRENT_V = 18,
-    MOTOR_2__OVERCURRENT_W = 19,
-    MOTOR_2__PHASE_IMBALANCE = 20,
-    MOTOR_2__IPM_IC_OVERTEMP = 21,
-    MOTOR_2__IPM_THERMISTOR_OVERTEMP = 22,
-    MOTOR_2__IPM_THERMISTOR_FAULT = 23,
-    MOTOR_2__IPM_FAULT = 24,
-    MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE = 25,
-    MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE = 26,
-    MOTOR_ALL__VBUS_UNDERVOLTAGE = 27,
-    MOTOR_ALL__VBUS_OVERVOLTAGE = 28,
-    MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED = 29
+    MOTOR_0__PWM_BREAK_INPUT_ACTIVE = 9,
+    MOTOR_1__OVERCURRENT_U = 10,
+    MOTOR_1__OVERCURRENT_V = 11,
+    MOTOR_1__OVERCURRENT_W = 12,
+    MOTOR_1__PHASE_IMBALANCE = 13,
+    MOTOR_1__IPM_IC_OVERTEMP = 14,
+    MOTOR_1__IPM_THERMISTOR_OVERTEMP = 15,
+    MOTOR_1__IPM_THERMISTOR_FAULT = 16,
+    MOTOR_1__IPM_FAULT = 17,
+    MOTOR_1__PWM_BREAK_INPUT_ACTIVE = 18,
+    MOTOR_2__OVERCURRENT_U = 19,
+    MOTOR_2__OVERCURRENT_V = 20,
+    MOTOR_2__OVERCURRENT_W = 21,
+    MOTOR_2__PHASE_IMBALANCE = 22,
+    MOTOR_2__IPM_IC_OVERTEMP = 23,
+    MOTOR_2__IPM_THERMISTOR_OVERTEMP = 24,
+    MOTOR_2__IPM_THERMISTOR_FAULT = 25,
+    MOTOR_2__IPM_FAULT = 26,
+    MOTOR_2__PWM_BREAK_INPUT_ACTIVE = 27,
+    MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE = 28,
+    MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE = 29,
+    MOTOR_ALL__VBUS_UNDERVOLTAGE = 30,
+    MOTOR_ALL__VBUS_OVERVOLTAGE = 31,
+    MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED = 32,
+    MOTOR_ALL__STO_CH1_FAULT = 33,
+    MOTOR_ALL__STO_CH2_FAULT = 34,
+    MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE = 35
 };
 
 // --- MessageSeverity enum ------------------------------------
@@ -135,6 +141,7 @@ struct _Msg_Motor_View {
     MessageId ipm_thermistor_overtemp() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 5); }
     MessageId ipm_thermistor_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 6); }
     MessageId ipm_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 7); }
+    MessageId pwm_break_input_active() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 8); }
 };
 
 struct _Msg_MotorAll_View {
@@ -144,6 +151,9 @@ struct _Msg_MotorAll_View {
     MessageId vbus_undervoltage() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 2); }
     MessageId vbus_overvoltage() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 3); }
     MessageId analog_phase_current_watchdog_triggered() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 4); }
+    MessageId sto_ch1_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 5); }
+    MessageId sto_ch2_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 6); }
+    MessageId aux_adc_cycle_not_done() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 7); }
 };
 
 struct _Msg_Faults {
@@ -163,26 +173,30 @@ struct _Msg_Motor {
     MessageId ipm_thermistor_overtemp;
     MessageId ipm_thermistor_fault;
     MessageId ipm_fault;
+    MessageId pwm_break_input_active;
 };
 
 struct _Msg_MotorAll {
-    static constexpr MessageId gate_supply_overvoltage = MessageId(25);
-    static constexpr MessageId gate_supply_undervoltage = MessageId(26);
-    static constexpr MessageId vbus_undervoltage = MessageId(27);
-    static constexpr MessageId vbus_overvoltage = MessageId(28);
-    static constexpr MessageId analog_phase_current_watchdog_triggered = MessageId(29);
+    static constexpr MessageId gate_supply_overvoltage = MessageId(28);
+    static constexpr MessageId gate_supply_undervoltage = MessageId(29);
+    static constexpr MessageId vbus_undervoltage = MessageId(30);
+    static constexpr MessageId vbus_overvoltage = MessageId(31);
+    static constexpr MessageId analog_phase_current_watchdog_triggered = MessageId(32);
+    static constexpr MessageId sto_ch1_fault = MessageId(33);
+    static constexpr MessageId sto_ch2_fault = MessageId(34);
+    static constexpr MessageId aux_adc_cycle_not_done = MessageId(35);
 
     _Msg_MotorAll_View operator[](uint8_t idx) const {
-        return _Msg_MotorAll_View{.base_msg_id = MessageId(static_cast<uint16_t>(25) + static_cast<uint16_t>(idx) * 5)};
+        return _Msg_MotorAll_View{.base_msg_id = MessageId(static_cast<uint16_t>(28) + static_cast<uint16_t>(idx) * 8)};
     }
 };
 
 struct _Msg {
     static constexpr _Msg_Faults faults{};
     static constexpr _Msg_Motor motor[3] = {
-        { MessageId(1), MessageId(2), MessageId(3), MessageId(4), MessageId(5), MessageId(6), MessageId(7), MessageId(8) },
-        { MessageId(9), MessageId(10), MessageId(11), MessageId(12), MessageId(13), MessageId(14), MessageId(15), MessageId(16) },
-        { MessageId(17), MessageId(18), MessageId(19), MessageId(20), MessageId(21), MessageId(22), MessageId(23), MessageId(24) },
+        { MessageId(1), MessageId(2), MessageId(3), MessageId(4), MessageId(5), MessageId(6), MessageId(7), MessageId(8), MessageId(9) },
+        { MessageId(10), MessageId(11), MessageId(12), MessageId(13), MessageId(14), MessageId(15), MessageId(16), MessageId(17), MessageId(18) },
+        { MessageId(19), MessageId(20), MessageId(21), MessageId(22), MessageId(23), MessageId(24), MessageId(25), MessageId(26), MessageId(27) },
     };
     static constexpr _Msg_MotorAll motor_all{};
 };

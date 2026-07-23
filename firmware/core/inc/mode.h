@@ -3,12 +3,12 @@
 
 #include <cstdint>
 #include "motor_channel.h"
-
+#include "aura.hpp"
 
 // runs actual logic and control that varies based on the mode of operation
 class mode {
     public:
-        mode(motor_channel* mtr_ch_ = nullptr);
+        mode(motor_channel* mtr_ch_, Messaging* msg_, time_interface* time_);
         void init();
 
         enum class states {
@@ -36,6 +36,8 @@ class mode {
 
     private:
         motor_channel* mtr_ch;
+        static Messaging* msg;
+        static time_interface* time;
 
         states current_state = states::IDLE;
         states requested_state = states::IDLE;
@@ -46,6 +48,7 @@ class mode {
 
         enum class pwm_startup_states {
             IDLE,
+            WAIT_FOR_AUX_ADC_READINGS,
             VERIFY_CHECKS,
             ENABLE_LOW_SIDE,
             WAIT_GATE_DRIVE_CHARGE,

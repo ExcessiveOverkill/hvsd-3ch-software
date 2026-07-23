@@ -38,6 +38,8 @@ motor_messages.add(Message("ipm_thermistor_overtemp", MessageSeverity.ERROR, des
 motor_messages.add(Message("ipm_thermistor_fault", MessageSeverity.ERROR, desc="IPM thermistor open/short circuit detected"))
 motor_messages.add(Message("ipm_fault", MessageSeverity.ERROR, desc="IPM fault pin triggered"))
 
+motor_messages.add(Message("pwm_break_input_active", MessageSeverity.ERROR, desc="Break input was active during operation"))
+
 device.messages.append(motor_messages)
 # Global registers
 
@@ -51,6 +53,11 @@ all_motor_messages.add(Message("vbus_undervoltage", MessageSeverity.ERROR, desc=
 all_motor_messages.add(Message("vbus_overvoltage", MessageSeverity.ERROR, desc="VBUS overvoltage detected"))
 
 all_motor_messages.add(Message("analog_phase_current_watchdog_triggered", MessageSeverity.ERROR, desc="Analog hardware watchdog triggered for phase current"))
+
+all_motor_messages.add(Message("sto_ch1_fault", MessageSeverity.ERROR, desc="STO channel 1 fault detected"))
+all_motor_messages.add(Message("sto_ch2_fault", MessageSeverity.ERROR, desc="STO channel 2 fault detected"))
+
+all_motor_messages.add(Message("aux_adc_cycle_not_done", MessageSeverity.CRITICAL, desc="Aux ADC never completed a cycle in timeout period"))
 
 device.messages.append(all_motor_messages)
 

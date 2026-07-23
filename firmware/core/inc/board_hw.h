@@ -525,10 +525,12 @@ inline constexpr IPM_Config NFAM2065L4B = { // values from datasheet
     .deadtime_ns = 1500,
     .min_pulse_width_ns = 1500,
     .phase_max_pwm_frequency_hz = 20000,
-    .phase_min_pwm_frequency_hz = 5000,
+    .phase_min_pwm_frequency_hz = 1000,
 };
 
 inline constexpr IPM_Config ipms = NFAM2065L4B; // select the IPMs installed on the board
+
+inline constexpr uint32_t ipm_start_gate_charge_delay_us = 300; // how long to hold the low-side fets on before using the high-side fets
 
 inline constexpr uint32_t phase_max_pwm_frequency_hz = ipms.phase_max_pwm_frequency_hz;
 inline constexpr uint32_t phase_min_pwm_frequency_hz = ipms.phase_min_pwm_frequency_hz;

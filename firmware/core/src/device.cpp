@@ -15,9 +15,9 @@ motor_channel device::motor_channels[3] = {
 };
 
 device::mode_options device::channel_modes[3] = {
-        { .none = mode(&device::motor_channels[0])},
-        { .none = mode(&device::motor_channels[1])},
-        { .none = mode(&device::motor_channels[2])}
+        { .none = mode(&device::motor_channels[0], &msg, &time)},
+        { .none = mode(&device::motor_channels[1], &msg, &time)},
+        { .none = mode(&device::motor_channels[2], &msg, &time)}
 };
 
 void device::missed_irq_handler(IRQ irq) {

@@ -16,31 +16,43 @@ const uint32_t message_values[MESSAGE_COUNT] = {
     0x30000006u,  // [  6] MOTOR_0__IPM_THERMISTOR_OVERTEMP  severity=ERROR
     0x30000007u,  // [  7] MOTOR_0__IPM_THERMISTOR_FAULT  severity=ERROR
     0x30000008u,  // [  8] MOTOR_0__IPM_FAULT  severity=ERROR
-    0x30000009u,  // [  9] MOTOR_1__OVERCURRENT_U  severity=ERROR
-    0x3000000Au,  // [ 10] MOTOR_1__OVERCURRENT_V  severity=ERROR
-    0x3000000Bu,  // [ 11] MOTOR_1__OVERCURRENT_W  severity=ERROR
-    0x3000000Cu,  // [ 12] MOTOR_1__PHASE_IMBALANCE  severity=ERROR
-    0x3000000Du,  // [ 13] MOTOR_1__IPM_IC_OVERTEMP  severity=ERROR
-    0x3000000Eu,  // [ 14] MOTOR_1__IPM_THERMISTOR_OVERTEMP  severity=ERROR
-    0x3000000Fu,  // [ 15] MOTOR_1__IPM_THERMISTOR_FAULT  severity=ERROR
-    0x30000010u,  // [ 16] MOTOR_1__IPM_FAULT  severity=ERROR
-    0x30000011u,  // [ 17] MOTOR_2__OVERCURRENT_U  severity=ERROR
-    0x30000012u,  // [ 18] MOTOR_2__OVERCURRENT_V  severity=ERROR
-    0x30000013u,  // [ 19] MOTOR_2__OVERCURRENT_W  severity=ERROR
-    0x30000014u,  // [ 20] MOTOR_2__PHASE_IMBALANCE  severity=ERROR
-    0x30000015u,  // [ 21] MOTOR_2__IPM_IC_OVERTEMP  severity=ERROR
-    0x30000016u,  // [ 22] MOTOR_2__IPM_THERMISTOR_OVERTEMP  severity=ERROR
-    0x30000017u,  // [ 23] MOTOR_2__IPM_THERMISTOR_FAULT  severity=ERROR
-    0x30000018u,  // [ 24] MOTOR_2__IPM_FAULT  severity=ERROR
-    0x30000019u,  // [ 25] MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE  severity=ERROR
-    0x3000001Au,  // [ 26] MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE  severity=ERROR
-    0x3000001Bu,  // [ 27] MOTOR_ALL__VBUS_UNDERVOLTAGE  severity=ERROR
-    0x3000001Cu,  // [ 28] MOTOR_ALL__VBUS_OVERVOLTAGE  severity=ERROR
-    0x3000001Du,  // [ 29] MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED  severity=ERROR
+    0x30000009u,  // [  9] MOTOR_0__PWM_BREAK_INPUT_ACTIVE  severity=ERROR
+    0x3000000Au,  // [ 10] MOTOR_1__OVERCURRENT_U  severity=ERROR
+    0x3000000Bu,  // [ 11] MOTOR_1__OVERCURRENT_V  severity=ERROR
+    0x3000000Cu,  // [ 12] MOTOR_1__OVERCURRENT_W  severity=ERROR
+    0x3000000Du,  // [ 13] MOTOR_1__PHASE_IMBALANCE  severity=ERROR
+    0x3000000Eu,  // [ 14] MOTOR_1__IPM_IC_OVERTEMP  severity=ERROR
+    0x3000000Fu,  // [ 15] MOTOR_1__IPM_THERMISTOR_OVERTEMP  severity=ERROR
+    0x30000010u,  // [ 16] MOTOR_1__IPM_THERMISTOR_FAULT  severity=ERROR
+    0x30000011u,  // [ 17] MOTOR_1__IPM_FAULT  severity=ERROR
+    0x30000012u,  // [ 18] MOTOR_1__PWM_BREAK_INPUT_ACTIVE  severity=ERROR
+    0x30000013u,  // [ 19] MOTOR_2__OVERCURRENT_U  severity=ERROR
+    0x30000014u,  // [ 20] MOTOR_2__OVERCURRENT_V  severity=ERROR
+    0x30000015u,  // [ 21] MOTOR_2__OVERCURRENT_W  severity=ERROR
+    0x30000016u,  // [ 22] MOTOR_2__PHASE_IMBALANCE  severity=ERROR
+    0x30000017u,  // [ 23] MOTOR_2__IPM_IC_OVERTEMP  severity=ERROR
+    0x30000018u,  // [ 24] MOTOR_2__IPM_THERMISTOR_OVERTEMP  severity=ERROR
+    0x30000019u,  // [ 25] MOTOR_2__IPM_THERMISTOR_FAULT  severity=ERROR
+    0x3000001Au,  // [ 26] MOTOR_2__IPM_FAULT  severity=ERROR
+    0x3000001Bu,  // [ 27] MOTOR_2__PWM_BREAK_INPUT_ACTIVE  severity=ERROR
+    0x3000001Cu,  // [ 28] MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE  severity=ERROR
+    0x3000001Du,  // [ 29] MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE  severity=ERROR
+    0x3000001Eu,  // [ 30] MOTOR_ALL__VBUS_UNDERVOLTAGE  severity=ERROR
+    0x3000001Fu,  // [ 31] MOTOR_ALL__VBUS_OVERVOLTAGE  severity=ERROR
+    0x30000020u,  // [ 32] MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED  severity=ERROR
+    0x30000021u,  // [ 33] MOTOR_ALL__STO_CH1_FAULT  severity=ERROR
+    0x30000022u,  // [ 34] MOTOR_ALL__STO_CH2_FAULT  severity=ERROR
+    0x40000023u,  // [ 35] MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE  severity=CRITICAL
 };
 
 // --- Persistent-mode debounce delay table (microseconds) -----
 const uint32_t message_delays[MESSAGE_COUNT] = {
+    0u,
+    0u,
+    0u,
+    0u,
+    0u,
+    0u,
     0u,
     0u,
     0u,
@@ -84,6 +96,7 @@ static const uint8_t _msg_string_id[MESSAGE_COUNT] = {
     6,  // MOTOR_0__IPM_THERMISTOR_OVERTEMP
     7,  // MOTOR_0__IPM_THERMISTOR_FAULT
     8,  // MOTOR_0__IPM_FAULT
+    9,  // MOTOR_0__PWM_BREAK_INPUT_ACTIVE
     1,  // MOTOR_1__OVERCURRENT_U
     2,  // MOTOR_1__OVERCURRENT_V
     3,  // MOTOR_1__OVERCURRENT_W
@@ -92,6 +105,7 @@ static const uint8_t _msg_string_id[MESSAGE_COUNT] = {
     6,  // MOTOR_1__IPM_THERMISTOR_OVERTEMP
     7,  // MOTOR_1__IPM_THERMISTOR_FAULT
     8,  // MOTOR_1__IPM_FAULT
+    9,  // MOTOR_1__PWM_BREAK_INPUT_ACTIVE
     1,  // MOTOR_2__OVERCURRENT_U
     2,  // MOTOR_2__OVERCURRENT_V
     3,  // MOTOR_2__OVERCURRENT_W
@@ -100,11 +114,15 @@ static const uint8_t _msg_string_id[MESSAGE_COUNT] = {
     6,  // MOTOR_2__IPM_THERMISTOR_OVERTEMP
     7,  // MOTOR_2__IPM_THERMISTOR_FAULT
     8,  // MOTOR_2__IPM_FAULT
-    9,  // MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE
-    10,  // MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE
-    11,  // MOTOR_ALL__VBUS_UNDERVOLTAGE
-    12,  // MOTOR_ALL__VBUS_OVERVOLTAGE
-    13,  // MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED
+    9,  // MOTOR_2__PWM_BREAK_INPUT_ACTIVE
+    10,  // MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE
+    11,  // MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE
+    12,  // MOTOR_ALL__VBUS_UNDERVOLTAGE
+    13,  // MOTOR_ALL__VBUS_OVERVOLTAGE
+    14,  // MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED
+    15,  // MOTOR_ALL__STO_CH1_FAULT
+    16,  // MOTOR_ALL__STO_CH2_FAULT
+    17,  // MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE
 };
 
 static const char* const _msg_names[UNIQUE_MSG_COUNT] = {
@@ -117,11 +135,15 @@ static const char* const _msg_names[UNIQUE_MSG_COUNT] = {
     "ipm_thermistor_overtemp",
     "ipm_thermistor_fault",
     "ipm_fault",
+    "pwm_break_input_active",
     "gate_supply_overvoltage",
     "gate_supply_undervoltage",
     "vbus_undervoltage",
     "vbus_overvoltage",
     "analog_phase_current_watchdog_triggered",
+    "sto_ch1_fault",
+    "sto_ch2_fault",
+    "aux_adc_cycle_not_done",
 };
 
 static const char* const _msg_descs[UNIQUE_MSG_COUNT] = {
@@ -134,11 +156,15 @@ static const char* const _msg_descs[UNIQUE_MSG_COUNT] = {
     "IPM thermistor temperature exceeded limit",
     "IPM thermistor open/short circuit detected",
     "IPM fault pin triggered",
+    "Break input was active during operation",
     "Gate supply overvoltage detected",
     "Gate supply undervoltage detected",
     "VBUS undervoltage detected",
     "VBUS overvoltage detected",
     "Analog hardware watchdog triggered for phase current",
+    "STO channel 1 fault detected",
+    "STO channel 2 fault detected",
+    "Aux ADC never completed a cycle in timeout period",
 };
 
 static const char* const _severity_labels[] = {
@@ -166,6 +192,7 @@ const int8_t msg_group_idx[MESSAGE_COUNT] = {
     1,  // MOTOR_0__IPM_THERMISTOR_OVERTEMP
     1,  // MOTOR_0__IPM_THERMISTOR_FAULT
     1,  // MOTOR_0__IPM_FAULT
+    1,  // MOTOR_0__PWM_BREAK_INPUT_ACTIVE
     1,  // MOTOR_1__OVERCURRENT_U
     1,  // MOTOR_1__OVERCURRENT_V
     1,  // MOTOR_1__OVERCURRENT_W
@@ -174,6 +201,7 @@ const int8_t msg_group_idx[MESSAGE_COUNT] = {
     1,  // MOTOR_1__IPM_THERMISTOR_OVERTEMP
     1,  // MOTOR_1__IPM_THERMISTOR_FAULT
     1,  // MOTOR_1__IPM_FAULT
+    1,  // MOTOR_1__PWM_BREAK_INPUT_ACTIVE
     1,  // MOTOR_2__OVERCURRENT_U
     1,  // MOTOR_2__OVERCURRENT_V
     1,  // MOTOR_2__OVERCURRENT_W
@@ -182,11 +210,15 @@ const int8_t msg_group_idx[MESSAGE_COUNT] = {
     1,  // MOTOR_2__IPM_THERMISTOR_OVERTEMP
     1,  // MOTOR_2__IPM_THERMISTOR_FAULT
     1,  // MOTOR_2__IPM_FAULT
+    1,  // MOTOR_2__PWM_BREAK_INPUT_ACTIVE
     2,  // MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE
     2,  // MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE
     2,  // MOTOR_ALL__VBUS_UNDERVOLTAGE
     2,  // MOTOR_ALL__VBUS_OVERVOLTAGE
     2,  // MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED
+    2,  // MOTOR_ALL__STO_CH1_FAULT
+    2,  // MOTOR_ALL__STO_CH2_FAULT
+    2,  // MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE
 };
 
 // --- Accessor function implementations -----------------------

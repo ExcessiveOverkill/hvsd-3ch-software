@@ -1,5 +1,5 @@
 // aura.hpp -- AURA generated master include -- do not edit
-// Re-run config.py to regenerate.  Generated: 2026-07-21
+// Re-run config.py to regenerate.  Generated: 2026-07-22
 #pragma once
 
 // Registers

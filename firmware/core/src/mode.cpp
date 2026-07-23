@@ -1,7 +1,9 @@
 #include "mode.h"
 
-mode::mode(motor_channel* mtr_ch_){
+mode::mode(motor_channel* mtr_ch_, Messaging* msg_, time_interface* time_){
     mtr_ch = mtr_ch_;
+    mode::msg = msg_;
+    mode::time = time_;
 }
 
 void mode::init() {
@@ -58,7 +60,21 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
     switch(start_state) {
         case pwm_startup_states::IDLE:
         {
-            start_state = pwm_startup_states::VERIFY_CHECKS;
+            adc_cycle_counter = 0;
+            start_state = pwm_startup_states::WAIT_FOR_AUX_ADC_READINGS;
+            break;
+        }
+        case pwm_startup_states::WAIT_FOR_AUX_ADC_READINGS:
+        {
+            // wait for auxiliary ADC readings to be available
+            if(adc_cycle_counter >= 100) {  // timeout
+                start_state = pwm_startup_states::IDLE;
+                msg->add(msgs.motor_all.aux_adc_cycle_not_done, 0);
+                return function_results::ERROR;
+            }
+            if(mtr_ch->aux_adc_cycle_complete()) {
+                start_state = pwm_startup_states::VERIFY_CHECKS;
+            }
             break;
         }
         case pwm_startup_states::VERIFY_CHECKS:
@@ -83,20 +99,22 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
                 start_state = pwm_startup_states::IDLE;
                 return function_results::ERROR;
             }
-            adc_cycle_counter = 0;
+            adc_cycle_counter = 1; // account for state switch delay
             start_state = pwm_startup_states::WAIT_GATE_DRIVE_CHARGE;
             break;
         }
         case pwm_startup_states::WAIT_GATE_DRIVE_CHARGE:
         {
-        // wait for gate drive to charge
-            if(adc_cycle_counter >= 100) { // TODO: make this a configurable parameter
+            // wait for gate drive to charge
+            if(adc_cycle_counter >= mtr_ch->calculate_pwm_cycles_from_us(board_hw::ipm_start_gate_charge_delay_us)) {
                 start_state = pwm_startup_states::DONE;
             }
             break;
         }
         case pwm_startup_states::DONE:
         {
+            int16_t val = 31000;
+            mtr_ch->set_scaled_pwm_values(val, val, val);
             return function_results::COMPLETE;
             break;
         }
@@ -245,3 +263,6 @@ void mode::next_state(mode::function_results result) {
         current_state = next_state;
     }
 }
+
+Messaging* mode::msg = nullptr;
+time_interface* mode::time = nullptr;

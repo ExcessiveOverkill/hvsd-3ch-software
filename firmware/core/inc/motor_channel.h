@@ -57,8 +57,11 @@ class motor_channel {
             return (config->timer->BDTR & TIM_BDTR_MOE) != 0;
         }
 
+        static uint32_t calculate_pwm_cycles_from_us(uint32_t microseconds);
+
         static bool global_safety_checks();
         bool channel_safety_checks();
+        static bool aux_adc_cycle_complete() { return aux_adc_data_ready; }
     
     private:
 
@@ -72,6 +75,9 @@ class motor_channel {
         static uint8_t phase_adc_sample_index;    // index of the current ADC sample in the sequence, shared between all channels since ADCs are synchronized
         static uint8_t num_of_channels; // number of motor channels
         static uint16_t phase_adc_trigger_offset; // number of timer ticks before the timer overflow event to trigger ADC conversion, shared between all channels since timers are synchronized
+        static bool aux_adc_data_ready; // all aux adc data is present
+        
+        static uint32_t ns_per_pwm_cycle; // number of nanoseconds per PWM cycle, shared between all channels since timers are synchronized
 
         static uint8_t aux_adc_sample_index; // index of the current auxiliary ADC sample in the sequence, shared between all channels since ADCs are synchronized
         static uint8_t aux_adc_result_left_shift; // number of bits to left shift auxiliary ADC result to align with 16-bit full scale after oversampling
@@ -104,6 +110,7 @@ class motor_channel {
         void vbus_sense_adc_init();
         void aux_adc_init();
         void ipm_fault_init();
+        void sto_init();
         void enable_adc_clock(ADC_TypeDef* adc);
         void power_on_adc(ADC_TypeDef* adc);
         void configure_adc_watchdog(ADC_TypeDef* adc, float current, uint16_t center_offset, uint32_t channels);
@@ -120,4 +127,6 @@ class motor_channel {
         static float calculate_adc_counts_from_current(float current_amps);
         static void reset_analog_watchdogs();
         static bool get_analog_watchdog_status();
+        bool get_sto_ch1_fault_status();
+        static bool get_sto_ch2_fault_status();
     };

@@ -14,6 +14,7 @@ motor_channel::motor_channel(uint8_t channel_num, const board_hw::motor_hw_confi
 }
 
 void motor_channel::init() {
+    sto_init();
     ipm_fault_init();
     phase_adc_init();
     timer_init();
@@ -253,6 +254,17 @@ void motor_channel::aux_adc_init() {
     NVIC_SetPriority(irq, 7); // medium priority
     NVIC_EnableIRQ(irq);
 
+}
+
+void motor_channel::sto_init() {
+    // configure STO fault detection
+    // must be called after main ADC init
+
+    // STO ch 1 for timer break inputs
+    gpio_ll::enable_port_clock(config->break_port);
+
+    // STO ch 2 for IPM disable
+    gpio_ll::enable_port_clock(board_hw::inverter_disable_port);
 }
 
 void motor_channel::vbus_sense_adc_init() {
@@ -624,6 +636,7 @@ void motor_channel::timer_init() {
     config->timer->BDTR |= 0b1 << TIM_BDTR_OSSI_Pos; // enable off-state selection for idle mode
     config->timer->BDTR |= 0b1 << TIM_BDTR_OSSR_Pos; // enable off-state selection for run mode
     config->timer->BDTR |= 0b1000 << TIM_BDTR_BKF_Pos; // set break filter to Fdts/8, 8 cycles
+    config->timer->BDTR |= TIM_BDTR_BKP;    // set break polarity to active high (fault when high)
     // config->timer->BDTR |= 0b1000 << TIM_BDTR_BK2F_Pos; // set break filter to Fdts/8, 8 cycles
     config->timer->BDTR |= 0b1 << TIM_BDTR_BKE_Pos; // enable break input
 
@@ -709,7 +722,7 @@ uint16_t motor_channel::timer_arr_from_frequency(float frequency_hz, float* resu
     }
 
     uint32_t timer_clock = board_hw::TIM1_ker_clk; // assuming all motor channels use the same timer clock, might want to make this configurable in the future
-    uint16_t arr = ((float)timer_clock / (frequency_hz * (float)board_hw::phase_pwm_timer_prescaler) * 2.0f) - 1;
+    uint16_t arr = ((float)timer_clock / (frequency_hz * 2.0f * (float)board_hw::phase_pwm_timer_prescaler)) - 1;
     if (resulting_frequency_hz) {
         *resulting_frequency_hz = (float)timer_clock / ((float)board_hw::phase_pwm_timer_prescaler * (arr + 1) * 2.0f); // calculate the actual frequency based on the calculated ARR value
     }
@@ -744,6 +757,7 @@ uint8_t motor_channel::main_output_enable() {
     if(config->timer->SR & TIM_SR_BIF) {
         // break interrupt flag is still set, indicating a fault condition
         // do not enable outputs (hardware prevents it anyway)
+        msg->add(motor_msgs.pwm_break_input_active, 0);
         return 1; // return 1 to indicate failure
     }
 
@@ -823,12 +837,20 @@ void motor_channel::set_scaled_pwm_values(int16_t phase_u, int16_t phase_v, int1
 
 void motor_channel::set_pwm_frequency(float frequency_hz, float* resulting_frequency_hz, uint16_t* resulting_arr) {
     // all timers must be stopped before changing the frequency!
-
-    uint16_t calc_arr = timer_arr_from_frequency(frequency_hz, resulting_frequency_hz);
+    uint16_t calc_arr = 0;
+    float calc_frequency_hz = 0;
+    if(resulting_frequency_hz == nullptr) {
+        calc_arr = timer_arr_from_frequency(frequency_hz, &calc_frequency_hz);
+    } else {
+        calc_arr = timer_arr_from_frequency(frequency_hz, resulting_frequency_hz);
+        calc_frequency_hz = *resulting_frequency_hz;
+    }
     config->timer->ARR = calc_arr;
     if(resulting_arr) {
         *resulting_arr = calc_arr;
     }
+
+    ns_per_pwm_cycle = 1e9f / calc_frequency_hz;
 
     // update ADC trigger compare value to match new frequency
     // ADC should trigger the same number of ticks before the up->down? timer overflow event.
@@ -952,6 +974,7 @@ void motor_channel::aux_adc_eoc_flagged_handler() {
             break;
         case 6:
             IPM_IC_temp[2] = calculate_IPM_IC_temp(data);
+            aux_adc_data_ready = true;
             break;
         default:
             // invalid sample index, TODO: handle error
@@ -1030,6 +1053,13 @@ bool motor_channel::global_safety_checks() {
         safety_ok = false;
     }
 
+    // STO IPM disable input fault detection
+    if(get_sto_ch2_fault_status()) {
+        // STO channel 2 fault detected, TODO: handle error
+        msg->add(msgs.motor_all.sto_ch2_fault, 0);
+        safety_ok = false;
+    }
+
     return safety_ok;
 }
 
@@ -1075,12 +1105,37 @@ bool motor_channel::channel_safety_checks() {
         safety_ok = false;
     }
 
+    // STO break input
+    if(get_sto_ch1_fault_status()) {
+        // STO channel 1 fault detected, TODO: handle error
+        msg->add(msgs.motor_all.sto_ch1_fault, 0);
+        safety_ok = false;
+    }
+
     if(!safety_ok) {
         // disable PWM outputs if any safety check failed
         main_output_disable();
     }
 
     return safety_ok;
+}
+
+bool motor_channel::get_sto_ch1_fault_status() {
+    // check if STO signal is invalid
+    bool sto_fault = false;
+    if(gpio_ll::read({config->break_port, config->break_pin}) == 1) {
+        sto_fault = true;
+    }
+    return sto_fault;
+}
+
+bool motor_channel::get_sto_ch2_fault_status() {
+    // check if STO signal is invalid
+    bool sto_fault = false;
+    if(gpio_ll::read({board_hw::inverter_disable_port, board_hw::inverter_disable_pin}) == 1) {
+        sto_fault = true;
+    }
+    return sto_fault;
 }
 
 void motor_channel::reset_faults(){
@@ -1139,12 +1194,21 @@ float motor_channel::calculate_adc_counts_from_current(float current_amps){
     return static_cast<float>(counts);
 }
 
+uint32_t motor_channel::calculate_pwm_cycles_from_us(uint32_t microseconds) {
+    // convert microseconds to PWM cycles based on the current timer configuration
+    // result is rounded UP to the nearest whole number of cycles
+    float cycles = (static_cast<float>(microseconds) * 1e-6f) / (ns_per_pwm_cycle * 1e-9f);
+    return static_cast<uint32_t>(ceilf(cycles));
+}
+
 
 uint8_t motor_channel::adc_resolution_bits = 12;
 uint8_t motor_channel::phase_adc_result_left_shift = 0;
 uint8_t motor_channel::phase_adc_sample_index = 0;
 uint8_t motor_channel::num_of_channels = 0;
 uint16_t motor_channel::phase_adc_trigger_offset = 0;
+
+uint32_t motor_channel::ns_per_pwm_cycle = 1e9f / board_hw::phase_min_pwm_frequency_hz; // default to minimum frequency
 
 uint8_t motor_channel::aux_adc_sample_index = 0;
 uint8_t motor_channel::aux_adc_result_left_shift = 0;
@@ -1157,6 +1221,7 @@ bool motor_channel::new_aux_adc_data_available = false;
 Messaging* motor_channel::msg = nullptr;
 time_interface* motor_channel::time = nullptr;
 float motor_channel::min_vbus_voltage = 0.0f;
+bool motor_channel::aux_adc_data_ready = false;
 
 uint16_t motor_channel::phase_u_vref_offset = 0;
 uint16_t motor_channel::phase_v_vref_offset = 0;
