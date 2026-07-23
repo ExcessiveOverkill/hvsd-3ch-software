@@ -10,6 +10,7 @@
 #include "reg_shell.hpp"
 
 #include "motor_channel.h"
+#include "cordic.h"
 
 #include "fan.h"
 #include "communication.h"
@@ -41,6 +42,8 @@ private:
     void start_pwm_timers_now();
 
     static time_interface time;
+
+    static cordic cordic_drv;
 
     static Messaging msg;
     RegShell shell;

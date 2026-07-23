@@ -53,7 +53,9 @@ set(symbols_SYMB
 add_executable(${EXECUTABLE} ${sources_SRCS}
     src/leds.cpp
     inc/time.h
-    src/time.cpp)
+    src/time.cpp
+    src/control_utils.cpp
+    src/cordic.cpp)
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})

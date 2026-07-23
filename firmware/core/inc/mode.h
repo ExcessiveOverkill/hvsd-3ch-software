@@ -4,6 +4,7 @@
 #include <cstdint>
 #include "motor_channel.h"
 #include "aura.hpp"
+#include "control_utils.h"
 
 // runs actual logic and control that varies based on the mode of operation
 class mode {
@@ -33,6 +34,29 @@ class mode {
 
         void reset();
 
+        enum class function_results {
+            CONTINUE,
+            COMPLETE,
+            ERROR
+        };
+
+        virtual void user_reset(){};
+
+        virtual function_results user_start_loop(){ return function_results::COMPLETE; };
+        virtual function_results user_start_flagged_timer_update(){ return function_results::COMPLETE; };
+        virtual function_results user_start_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
+        virtual function_results user_start_flagged_systick(){ return function_results::COMPLETE; };
+
+        virtual function_results user_run_loop(){ return function_results::COMPLETE; };
+        virtual function_results user_run_flagged_timer_update(){ return function_results::COMPLETE; };
+        virtual function_results user_run_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
+        virtual function_results user_run_flagged_systick(){ return function_results::COMPLETE; };
+
+        virtual function_results user_soft_stop_loop(){ return function_results::COMPLETE; };
+        virtual function_results user_soft_stop_flagged_timer_update(){ return function_results::COMPLETE; };
+        virtual function_results user_soft_stop_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
+        virtual function_results user_soft_stop_flagged_systick(){ return function_results::COMPLETE; };
+
 
     private:
         motor_channel* mtr_ch;
@@ -55,15 +79,7 @@ class mode {
             DONE
         } start_state = pwm_startup_states::IDLE;
 
-        enum class function_results {
-            CONTINUE,
-            COMPLETE,
-            ERROR
-        };
-
         void next_state(function_results result);
-
-        virtual void user_reset(){};
 
         function_results idle_flagged_all_adc_eoc();
         function_results start_flagged_all_adc_eoc();
@@ -72,20 +88,7 @@ class mode {
         function_results hard_stop_flagged_all_adc_eoc();
         function_results fault_flagged_all_adc_eoc();
 
-        virtual function_results user_start_loop(){ return function_results::COMPLETE; };
-        virtual function_results user_start_flagged_timer_update(){ return function_results::COMPLETE; };
-        virtual function_results user_start_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
-        virtual function_results user_start_flagged_systick(){ return function_results::COMPLETE; };
-
-        virtual function_results user_run_loop(){ return function_results::COMPLETE; };
-        virtual function_results user_run_flagged_timer_update(){ return function_results::COMPLETE; };
-        virtual function_results user_run_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
-        virtual function_results user_run_flagged_systick(){ return function_results::COMPLETE; };
-
-        virtual function_results user_soft_stop_loop(){ return function_results::COMPLETE; };
-        virtual function_results user_soft_stop_flagged_timer_update(){ return function_results::COMPLETE; };
-        virtual function_results user_soft_stop_flagged_all_adc_eoc(){ return function_results::COMPLETE; };
-        virtual function_results user_soft_stop_flagged_systick(){ return function_results::COMPLETE; };
+        
 
 
 

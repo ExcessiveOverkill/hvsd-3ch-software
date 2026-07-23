@@ -19,6 +19,7 @@ class motor_channel {
         void start_timer_unsynced();
         void start_timer_synced();
         void set_scaled_pwm_values(int16_t phase_u, int16_t phase_v, int16_t phase_w);
+        bool set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage);
         void set_pwm_frequency(float frequency_hz, float* resulting_frequency_hz = nullptr, uint16_t* resulting_arr = nullptr);
         void manual_phase_adc_trigger();
         static void manual_aux_adc_trigger();
@@ -106,6 +107,12 @@ class motor_channel {
 
         static float min_vbus_voltage;
 
+        bool use_discontinuous_pwm = false; // use discontinuous PWM mode to reduce switching losses
+        bool use_basic_deadtime_compensation = false; // use basic deadtime compensation to provide more accurate phase voltage control
+        bool use_advanced_deadtime_compensation = false; // use advanced deadtime compensation to provide more accurate phase voltage control
+
+
+
         void phase_adc_init();
         void vbus_sense_adc_init();
         void aux_adc_init();
@@ -119,12 +126,18 @@ class motor_channel {
         void timer_init();
         uint16_t timer_arr_from_frequency(float frequency_hz, float* resulting_frequency_hz = nullptr);
         uint16_t get_adc_reading_blocking(ADC_TypeDef* adc, uint32_t channel);
+        static void trigger_vbus_sense_adc_reading();
         static float calculate_gate_supply_voltage(uint16_t adc_value);
         static float calculate_VBUS_voltage(uint16_t adc_value);
         static float calculate_IPM_IC_temp(uint16_t adc_value);
         static float calculate_IPM_IC_thermistor_temp(uint16_t adc_value);
         static float calculate_phase_current(uint16_t adc_value, int16_t adc_offset, uint16_t adc_vref_2_offset = 32768);
         static float calculate_adc_counts_from_current(float current_amps);
+        static float calculate_svpwm_offset(float v_u, float v_v, float v_w);
+        bool select_discontinuous_offset(float v_u, float v_v, float v_w, float v_half, float& offset);
+        static int16_t voltage_to_raw(float voltage, float v_half);
+        void apply_basic_deadtime_compensation(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w);
+        void enforce_min_pulse_width(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w);
         static void reset_analog_watchdogs();
         static bool get_analog_watchdog_status();
         bool get_sto_ch1_fault_status();

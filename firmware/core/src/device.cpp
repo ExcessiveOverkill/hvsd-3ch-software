@@ -7,6 +7,7 @@ device::IRQ device::missed_irq = device::IRQ::NONE;
 device* device::active_instance = nullptr;
 Messaging device::msg;
 time_interface device::time;
+cordic device::cordic_drv;
 
 motor_channel device::motor_channels[3] = {
     motor_channel(0, &board_hw::motor_configs[0], &msg, &time),
@@ -165,6 +166,7 @@ void device::init() {
     systick_init();
     time.init();
     opamps_init();
+    cordic_drv.init();
 
     fan.init();
     fan.set_speed_percent(0);

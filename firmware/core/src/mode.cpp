@@ -113,8 +113,8 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
         }
         case pwm_startup_states::DONE:
         {
-            int16_t val = 31000;
-            mtr_ch->set_scaled_pwm_values(val, val, val);
+            // mtr_ch->set_phase_voltage(5.0f, 0.0f, 0.0f);    // for testing only
+            mtr_ch->set_scaled_pwm_values(-32768, -32768, -32768); // set all phases to 0% duty cycle
             return function_results::COMPLETE;
             break;
         }

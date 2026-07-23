@@ -274,9 +274,9 @@ void motor_channel::vbus_sense_adc_init() {
 
     // uses same ADC as phase sense, so we use auto injected conversion to read VBUS sense after phase sense conversion
 
-    adc->CFGR |= ADC_CFGR_JAUTO; // enable auto-injected conversion mode
+    // adc->CFGR |= ADC_CFGR_JAUTO; // enable auto-injected conversion mode
 
-    adc->CFGR |= ADC_CFGR_JDISCEN;   // enable discontinuous mode
+    // adc->CFGR |= ADC_CFGR_JDISCEN;   // enable discontinuous mode
     adc->CFGR2 |= ADC_CFGR2_JOVSE;  // enable oversampling for injected conversions
 
     adc->JSQR |= board_hw::vbus_sense_channel << ADC_JSQR_JSQ1_Pos; // set injected channel to VBUS sense
@@ -288,6 +288,14 @@ void motor_channel::vbus_sense_adc_init() {
     configure_adc_sample_time(adc, board_hw::vbus_sense_channel, cycles);
 
     adc->IER |= ADC_IER_JEOCIE; // enable end of injected conversion interrupt
+
+    // irq is already enabled in phase_adc_init() since it uses the same ADC instance
+}
+
+void motor_channel::trigger_vbus_sense_adc_reading() {
+    // trigger an injected conversion for VBUS sense ADC
+    ADC_TypeDef* adc = board_hw::vbus_sense_adc;
+    adc->CR |= ADC_CR_JADSTART; // start injected conversion
 }
 
 uint16_t motor_channel::get_adc_reading_blocking(ADC_TypeDef* adc, uint32_t channel){
@@ -917,6 +925,10 @@ bool motor_channel::aux_adc_enabled() {
 }
 
 void motor_channel::all_phase_adc_eoc_flagged_handler() {
+
+    // read vbus
+    trigger_vbus_sense_adc_reading();
+
     // read ADC results
     phase_u_current = calculate_phase_current(board_hw::phase_u_adc->DR << phase_adc_result_left_shift, phase_u_adc_offset, phase_u_vref_offset);
     phase_v_current = calculate_phase_current(board_hw::phase_v_adc->DR << phase_adc_result_left_shift, phase_v_adc_offset, phase_v_vref_offset);
@@ -1199,6 +1211,167 @@ uint32_t motor_channel::calculate_pwm_cycles_from_us(uint32_t microseconds) {
     // result is rounded UP to the nearest whole number of cycles
     float cycles = (static_cast<float>(microseconds) * 1e-6f) / (ns_per_pwm_cycle * 1e-9f);
     return static_cast<uint32_t>(ceilf(cycles));
+}
+
+float motor_channel::calculate_svpwm_offset(float v_u, float v_v, float v_w) {
+    // standard min-max (third-harmonic-equivalent) injection: centers the desired phase
+    // voltages within the available range, maximizing VBUS utilization. Produces the same
+    // output as conventional sector-based space vector PWM.
+    float v_min = v_u;
+    if(v_v < v_min) v_min = v_v;
+    if(v_w < v_min) v_min = v_w;
+
+    float v_max = v_u;
+    if(v_v > v_max) v_max = v_v;
+    if(v_w > v_max) v_max = v_w;
+
+    return -(v_max + v_min) * 0.5f;
+}
+
+bool motor_channel::select_discontinuous_offset(float v_u, float v_v, float v_w, float v_half, float& offset) {
+    // try to hold the phase with the highest current at 0% duty (bottom rail) to reduce
+    // switching losses on the phase that would otherwise dissipate the most. Falls back to the
+    // next highest current phase if VBUS can't support clamping the first choice.
+    float voltages[3] = {v_u, v_v, v_w};
+    float current_mag[3] = {fabsf(phase_u_current), fabsf(phase_v_current), fabsf(phase_w_current)};
+
+    uint8_t order[3] = {0, 1, 2};
+    for(uint8_t i = 0; i < 2; i++){
+        for(uint8_t j = i + 1; j < 3; j++){
+            if(current_mag[order[j]] > current_mag[order[i]]){
+                uint8_t temp = order[i];
+                order[i] = order[j];
+                order[j] = temp;
+            }
+        }
+    }
+
+    for(uint8_t i = 0; i < 3; i++){
+        uint8_t clamp_idx = order[i];
+        float candidate_offset = -v_half - voltages[clamp_idx];
+
+        bool feasible = true;
+        for(uint8_t k = 0; k < 3; k++){
+            if(k == clamp_idx) continue;
+            float v = voltages[k] + candidate_offset;
+            if(v < -v_half || v > v_half){
+                feasible = false;
+                break;
+            }
+        }
+
+        if(feasible){
+            offset = candidate_offset;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+int16_t motor_channel::voltage_to_raw(float voltage, float v_half) {
+    if(v_half <= 0.0f) return 0; // VBUS not valid yet, default to safe centered output
+
+    float raw_f = (voltage / v_half) * 32767.0f;
+    if(raw_f > 32767.0f) raw_f = 32767.0f;
+    if(raw_f < -32768.0f) raw_f = -32768.0f;
+    return static_cast<int16_t>(raw_f);
+}
+
+void motor_channel::apply_basic_deadtime_compensation(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w) {
+    // compensate for the fixed hardware deadtime by shifting the commanded duty cycle by the
+    // volt-time error it introduces. Sign follows current direction: assumes positive phase
+    // current flows out of the inverter leg into the motor winding, which means the low-side
+    // body diode conducts during the dead interval, pulling the phase low and reducing the
+    // effective output voltage below the commanded value - so duty is increased to compensate.
+    // Flip this sign if bench testing shows it's backwards for this hardware.
+    constexpr float current_deadband_amps = 0.2f; // avoid chattering right at the current zero-crossing
+
+    float deadtime_fraction = static_cast<float>(board_hw::ipms.deadtime_ns) / static_cast<float>(ns_per_pwm_cycle);
+    float raw_correction = deadtime_fraction * 65536.0f;
+
+    int16_t* raws[3] = {&raw_u, &raw_v, &raw_w};
+    float currents[3] = {phase_u_current, phase_v_current, phase_w_current};
+
+    for(uint8_t i = 0; i < 3; i++){
+        float corrected = static_cast<float>(*raws[i]);
+        if(currents[i] > current_deadband_amps){
+            corrected += raw_correction;
+        } else if(currents[i] < -current_deadband_amps){
+            corrected -= raw_correction;
+        } else {
+            continue;
+        }
+
+        if(corrected > 32767.0f) corrected = 32767.0f;
+        if(corrected < -32768.0f) corrected = -32768.0f;
+        *raws[i] = static_cast<int16_t>(corrected);
+    }
+}
+
+void motor_channel::enforce_min_pulse_width(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w) {
+    // the IPM can't reliably switch a pulse shorter than min_pulse_width_ns. If a phase's raw
+    // command is close to, but not exactly at, a rail, snap it to the rail rather than
+    // commanding an unreliably-short pulse on the opposite switch. A true 0%/100% command is
+    // fine, the hardware can hold either rail indefinitely.
+    float min_pulse_raw = (static_cast<float>(board_hw::ipms.min_pulse_width_ns) / static_cast<float>(ns_per_pwm_cycle)) * 65536.0f;
+
+    int16_t* raws[3] = {&raw_u, &raw_v, &raw_w};
+    for(uint8_t i = 0; i < 3; i++){
+        float r = static_cast<float>(*raws[i]);
+        if(r < (-32768.0f + min_pulse_raw)){
+            *raws[i] = -32768;
+        } else if(r > (32767.0f - min_pulse_raw)){
+            *raws[i] = 32767;
+        }
+    }
+}
+
+bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage) {
+    // set the phase voltages in volts, relative to an arbitrary common reference - only the
+    // relative (line-to-line) voltages matter, a common offset across all 3 phases is fine and
+    // is exactly what the SVPWM/discontinuous PWM offset selection below relies on.
+
+    float vbus = get_VBUS_voltage();
+    if(vbus <= 0.0f){
+        set_scaled_pwm_values(0, 0, 0); // VBUS not valid yet, hold a safe centered output
+        return false;
+    }
+    float v_half = vbus * 0.5f;
+
+    float v_u = phase_u_voltage;
+    float v_v = phase_v_voltage;
+    float v_w = phase_w_voltage;
+
+    float offset = 0.0f;
+    bool clamped = use_discontinuous_pwm && select_discontinuous_offset(v_u, v_v, v_w, v_half, offset);
+    if(!clamped){
+        // either discontinuous PWM is disabled, or no single phase could be held at 0% within
+        // VBUS limits - use standard SVPWM to make full use of the available VBUS
+        offset = calculate_svpwm_offset(v_u, v_v, v_w);
+    }
+
+    v_u += offset;
+    v_v += offset;
+    v_w += offset;
+
+    int16_t raw_u = voltage_to_raw(v_u, v_half);
+    int16_t raw_v = voltage_to_raw(v_v, v_half);
+    int16_t raw_w = voltage_to_raw(v_w, v_half);
+
+    if(use_basic_deadtime_compensation){
+        apply_basic_deadtime_compensation(raw_u, raw_v, raw_w);
+    }
+    if(use_advanced_deadtime_compensation){
+        // TODO: needs a characterization LUT (ipm temp x VBUS x phase current -> switching
+        // delay) built from bench test data, which doesn't exist yet.
+    }
+
+    enforce_min_pulse_width(raw_u, raw_v, raw_w);
+
+    set_scaled_pwm_values(raw_u, raw_v, raw_w);
+
+    return true;
 }
 
 
