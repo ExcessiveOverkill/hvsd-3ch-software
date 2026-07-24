@@ -18,7 +18,7 @@ class motor_channel {
         void stop_timer();
         void start_timer_unsynced();
         void start_timer_synced();
-        void set_scaled_pwm_values(int16_t phase_u, int16_t phase_v, int16_t phase_w);
+        void set_scaled_pwm_values(float phase_u, float phase_v, float phase_w);
         bool set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage);
         void set_pwm_frequency(float frequency_hz, float* resulting_frequency_hz = nullptr, uint16_t* resulting_arr = nullptr);
         void manual_phase_adc_trigger();
@@ -48,11 +48,7 @@ class motor_channel {
             phase_v = phase_v_current;
             phase_w = phase_w_current;
         }
-        void zero_phase_adcs() {
-            phase_u_adc_offset = board_hw::phase_u_adc->DR << phase_adc_result_left_shift;
-            phase_v_adc_offset = board_hw::phase_v_adc->DR << phase_adc_result_left_shift;
-            phase_w_adc_offset = board_hw::phase_w_adc->DR << phase_adc_result_left_shift;
-        }
+        void zero_phase_adcs();
 
         bool main_output_enabled() {
             return (config->timer->BDTR & TIM_BDTR_MOE) != 0;
@@ -63,7 +59,8 @@ class motor_channel {
         static bool global_safety_checks();
         bool channel_safety_checks();
         static bool aux_adc_cycle_complete() { return aux_adc_data_ready; }
-    
+        _Msg_Motor get_motor_msgs() { return motor_msgs; }
+
     private:
 
         static Messaging* msg;
@@ -79,6 +76,7 @@ class motor_channel {
         static bool aux_adc_data_ready; // all aux adc data is present
         
         static uint32_t ns_per_pwm_cycle; // number of nanoseconds per PWM cycle, shared between all channels since timers are synchronized
+        static float pwm_frequency_hz; // PWM frequency in Hz, shared between all channels since timers are synchronized
 
         static uint8_t aux_adc_sample_index; // index of the current auxiliary ADC sample in the sequence, shared between all channels since ADCs are synchronized
         static uint8_t aux_adc_result_left_shift; // number of bits to left shift auxiliary ADC result to align with 16-bit full scale after oversampling

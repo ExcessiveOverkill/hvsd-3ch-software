@@ -55,7 +55,8 @@ add_executable(${EXECUTABLE} ${sources_SRCS}
     inc/time.h
     src/time.cpp
     src/control_utils.cpp
-    src/cordic.cpp)
+    src/cordic.cpp
+    src/pmsm_ident_mode.cpp)
 
 # Include paths
 target_include_directories(${EXECUTABLE} PRIVATE ${include_path_DIRS})

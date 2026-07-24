@@ -316,7 +316,7 @@ uint16_t motor_channel::get_adc_reading_blocking(ADC_TypeDef* adc, uint32_t chan
     uint16_t result = adc->DR << phase_adc_result_left_shift; // left shift to align with 16-bit full scale after oversampling
 
     // clear the EOC flag
-    adc->ISR |= ADC_ISR_EOC;
+    adc->ISR = ADC_ISR_EOC;
 
     return result;
 }
@@ -830,13 +830,19 @@ void motor_channel::start_timer_synced() {
 
 }
 
-void motor_channel::set_scaled_pwm_values(int16_t phase_u, int16_t phase_v, int16_t phase_w) {
+void motor_channel::set_scaled_pwm_values(float phase_u, float phase_v, float phase_w) {
     // won't take effect until the next update event
+    // inputs are duty cycle scaled from -1.0 (0%) to 1.0 (100%)
 
     uint16_t arr = config->timer->ARR;
-    uint16_t compare_u = ((static_cast<int32_t>(phase_u) * static_cast<int32_t>(arr)) >> 16) + (arr / 2);
-    uint16_t compare_v = ((static_cast<int32_t>(phase_v) * static_cast<int32_t>(arr)) >> 16) + (arr / 2);
-    uint16_t compare_w = ((static_cast<int32_t>(phase_w) * static_cast<int32_t>(arr)) >> 16) + (arr / 2);
+
+    float u = phase_u < -1.0f ? -1.0f : (phase_u > 1.0f ? 1.0f : phase_u);
+    float v = phase_v < -1.0f ? -1.0f : (phase_v > 1.0f ? 1.0f : phase_v);
+    float w = phase_w < -1.0f ? -1.0f : (phase_w > 1.0f ? 1.0f : phase_w);
+
+    uint16_t compare_u = static_cast<uint16_t>((-u * 0.5f + 0.5f) * static_cast<float>(arr));
+    uint16_t compare_v = static_cast<uint16_t>((-v * 0.5f + 0.5f) * static_cast<float>(arr));
+    uint16_t compare_w = static_cast<uint16_t>((-w * 0.5f + 0.5f) * static_cast<float>(arr));
 
     *((volatile uint16_t*)(&config->timer->CCR1 + config->phase_u_ch-1)) = compare_u;
     *((volatile uint16_t*)(&config->timer->CCR1 + config->phase_v_ch-1)) = compare_v;
@@ -846,19 +852,18 @@ void motor_channel::set_scaled_pwm_values(int16_t phase_u, int16_t phase_v, int1
 void motor_channel::set_pwm_frequency(float frequency_hz, float* resulting_frequency_hz, uint16_t* resulting_arr) {
     // all timers must be stopped before changing the frequency!
     uint16_t calc_arr = 0;
-    float calc_frequency_hz = 0;
     if(resulting_frequency_hz == nullptr) {
-        calc_arr = timer_arr_from_frequency(frequency_hz, &calc_frequency_hz);
+        calc_arr = timer_arr_from_frequency(frequency_hz, &pwm_frequency_hz);
     } else {
-        calc_arr = timer_arr_from_frequency(frequency_hz, resulting_frequency_hz);
-        calc_frequency_hz = *resulting_frequency_hz;
+        calc_arr = timer_arr_from_frequency(frequency_hz, &pwm_frequency_hz);
+        *resulting_frequency_hz = pwm_frequency_hz;
     }
     config->timer->ARR = calc_arr;
     if(resulting_arr) {
         *resulting_arr = calc_arr;
     }
 
-    ns_per_pwm_cycle = 1e9f / calc_frequency_hz;
+    ns_per_pwm_cycle = 1e9f / pwm_frequency_hz;
 
     // update ADC trigger compare value to match new frequency
     // ADC should trigger the same number of ticks before the up->down? timer overflow event.
@@ -1183,6 +1188,12 @@ float motor_channel::calculate_IPM_IC_temp(uint16_t adc_value) {
     return static_cast<float>(adc_value);
 }
 
+void motor_channel::zero_phase_adcs() {
+    phase_u_adc_offset = static_cast<int32_t>(board_hw::phase_u_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_u_vref_offset);
+    phase_v_adc_offset = static_cast<int32_t>(board_hw::phase_v_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_v_vref_offset);
+    phase_w_adc_offset = static_cast<int32_t>(board_hw::phase_w_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_w_vref_offset);
+}
+
 float motor_channel::calculate_phase_current(uint16_t adc_value, int16_t adc_offset, uint16_t adc_vref_2_offset) {
     // convert ADC value to phase current in amps from sense shunts
     constexpr float adc_lsb_volts = board_hw::vref_voltage / 65535.0f;
@@ -1209,7 +1220,7 @@ float motor_channel::calculate_adc_counts_from_current(float current_amps){
 uint32_t motor_channel::calculate_pwm_cycles_from_us(uint32_t microseconds) {
     // convert microseconds to PWM cycles based on the current timer configuration
     // result is rounded UP to the nearest whole number of cycles
-    float cycles = (static_cast<float>(microseconds) * 1e-6f) / (ns_per_pwm_cycle * 1e-9f);
+    float cycles = (static_cast<float>(microseconds) * 1e-6f) * pwm_frequency_hz;
     return static_cast<uint32_t>(ceilf(cycles));
 }
 
@@ -1334,7 +1345,7 @@ bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_volta
 
     float vbus = get_VBUS_voltage();
     if(vbus <= 0.0f){
-        set_scaled_pwm_values(0, 0, 0); // VBUS not valid yet, hold a safe centered output
+        set_scaled_pwm_values(0.0f, 0.0f, 0.0f); // VBUS not valid yet, hold a safe centered output
         return false;
     }
     float v_half = vbus * 0.5f;
@@ -1369,7 +1380,7 @@ bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_volta
 
     enforce_min_pulse_width(raw_u, raw_v, raw_w);
 
-    set_scaled_pwm_values(raw_u, raw_v, raw_w);
+    set_scaled_pwm_values(static_cast<float>(raw_u) / 32768.0f, static_cast<float>(raw_v) / 32768.0f, static_cast<float>(raw_w) / 32768.0f);
 
     return true;
 }
@@ -1382,7 +1393,7 @@ uint8_t motor_channel::num_of_channels = 0;
 uint16_t motor_channel::phase_adc_trigger_offset = 0;
 
 uint32_t motor_channel::ns_per_pwm_cycle = 1e9f / board_hw::phase_min_pwm_frequency_hz; // default to minimum frequency
-
+float motor_channel::pwm_frequency_hz = board_hw::phase_min_pwm_frequency_hz; // default to minimum frequency
 uint8_t motor_channel::aux_adc_sample_index = 0;
 uint8_t motor_channel::aux_adc_result_left_shift = 0;
 

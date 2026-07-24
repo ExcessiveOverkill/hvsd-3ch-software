@@ -17,6 +17,7 @@
 #include "leds.h"
 
 #include "mode.h"
+#include "pmsm_ident_mode.h"
 
 
 class device {
@@ -62,6 +63,7 @@ private:
 
     struct mode_options {
         mode none;
+        pmsm_ident_mode pmsm_ident;
     };
 
     static mode_options channel_modes[3];

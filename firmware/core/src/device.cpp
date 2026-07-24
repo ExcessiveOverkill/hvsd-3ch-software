@@ -16,9 +16,15 @@ motor_channel device::motor_channels[3] = {
 };
 
 device::mode_options device::channel_modes[3] = {
-        { .none = mode(&device::motor_channels[0], &msg, &time)},
-        { .none = mode(&device::motor_channels[1], &msg, &time)},
-        { .none = mode(&device::motor_channels[2], &msg, &time)}
+        { .none = mode(&device::motor_channels[0], &msg, &time),
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[0], &msg, &time)
+        },
+        { .none = mode(&device::motor_channels[1], &msg, &time),
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[1], &msg, &time)
+        },
+        { .none = mode(&device::motor_channels[2], &msg, &time),
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[2], &msg, &time)
+        }
 };
 
 void device::missed_irq_handler(IRQ irq) {
@@ -182,15 +188,22 @@ void device::init() {
 
         // init all modes
         channel_modes[i].none.init();
+        channel_modes[i].pmsm_ident.init();
         // other modes can be added here in the future
 
 
-        channel_current_mode_instance[i] = &channel_modes[i].none;  // set to default mode
+        // channel_current_mode_instance[i] = &channel_modes[i].none;  // set to default mode
+        
+        channel_current_mode_instance[i] = &channel_modes[i].pmsm_ident;  // for testing
+        
         motor_channels[i].init();
 
     }
 
-    force_restart_pwm_timers(board_hw::phase_min_pwm_frequency_hz); // start PWM timers at minimum frequency
+    // force_restart_pwm_timers(board_hw::phase_min_pwm_frequency_hz); // start PWM timers at minimum frequency
+
+    force_restart_pwm_timers(5000.0f);
+
     
     channel_current_mode_instance[0]->set_requested_state(mode::states::RUN);
 
@@ -324,10 +337,6 @@ bool device::force_restart_pwm_timers(float frequency_hz) {
     // force restart of PWM timers at the specified frequency
     // stops timers and adcs, changes frequency, and restarts timers and adcs
 
-    channel_current_mode_instance[0]->reset();
-    channel_current_mode_instance[1]->reset();
-    channel_current_mode_instance[2]->reset();
-
     // stop all timers
     motor_channels[0].stop_timer();
     motor_channels[1].stop_timer();
@@ -368,6 +377,10 @@ bool device::force_restart_pwm_timers(float frequency_hz) {
 
     // TODO: optional to start timers at a specific sync timer count, for now just start immediately
     start_pwm_timers_now();
+
+    channel_current_mode_instance[0]->reset();
+    channel_current_mode_instance[1]->reset();
+    channel_current_mode_instance[2]->reset();
 
     return true;
 }

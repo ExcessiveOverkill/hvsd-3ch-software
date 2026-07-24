@@ -71,6 +71,36 @@ void slew_rate_limiter::reset(float value) {
     output = value;
 }
 
+void linear_regression::reset() {
+    sum_x = 0.0;
+    sum_y = 0.0;
+    sum_xy = 0.0;
+    sum_xx = 0.0;
+    n = 0;
+}
+
+void linear_regression::add_sample(float x, float y) {
+    double xd = x;
+    double yd = y;
+    sum_x += xd;
+    sum_y += yd;
+    sum_xy += xd * yd;
+    sum_xx += xd * xd;
+    n++;
+}
+
+float linear_regression::slope() const {
+    if(n < 2) return 0.0f;
+    double denom = static_cast<double>(n) * sum_xx - sum_x * sum_x;
+    if(denom == 0.0) return 0.0f; // degenerate (all x identical)
+    return static_cast<float>((static_cast<double>(n) * sum_xy - sum_x * sum_y) / denom);
+}
+
+float linear_regression::intercept() const {
+    if(n < 2) return 0.0f;
+    return static_cast<float>((sum_y - static_cast<double>(slope()) * sum_x) / static_cast<double>(n));
+}
+
 namespace foc {
 
 alpha_beta clarke(three_phase abc) {

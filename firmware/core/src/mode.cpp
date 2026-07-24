@@ -94,7 +94,7 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
         case pwm_startup_states::ENABLE_LOW_SIDE:
         {
             // enable low side switches
-            mtr_ch->set_scaled_pwm_values(-32768, -32768, -32768); // set all phases to 0% duty cycle
+            mtr_ch->set_scaled_pwm_values(-1.0f, -1.0f, -1.0f); // set all phases to 0% duty cycle
             if(mtr_ch->main_output_enable() != 0){
                 start_state = pwm_startup_states::IDLE;
                 return function_results::ERROR;
@@ -107,14 +107,28 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
         {
             // wait for gate drive to charge
             if(adc_cycle_counter >= mtr_ch->calculate_pwm_cycles_from_us(board_hw::ipm_start_gate_charge_delay_us)) {
-                start_state = pwm_startup_states::DONE;
+                start_state = pwm_startup_states::ENABLE_HIGH_SIDE;
             }
+            break;
+        }
+        case pwm_startup_states::ENABLE_HIGH_SIDE:
+        {
+            // enable high side switches
+            mtr_ch->set_scaled_pwm_values(1.0f, 1.0f, 1.0f); // set all phases to 100% duty cycle
+            // ensures no current can flow through low side shunts, and allows for phase ADC zero offset measurement
+            start_state = pwm_startup_states::MEASURE_PHASE_ADC_ZERO_OFFSETS;
+            break;
+        }
+        case pwm_startup_states::MEASURE_PHASE_ADC_ZERO_OFFSETS:
+        {
+            // measure phase ADC zero offsets
+            mtr_ch->zero_phase_adcs();
+            start_state = pwm_startup_states::DONE;
             break;
         }
         case pwm_startup_states::DONE:
         {
-            // mtr_ch->set_phase_voltage(5.0f, 0.0f, 0.0f);    // for testing only
-            mtr_ch->set_scaled_pwm_values(-32768, -32768, -32768); // set all phases to 0% duty cycle
+            mtr_ch->set_scaled_pwm_values(-1.0f, -1.0f, -1.0f); // set all phases to 0% duty cycle
             return function_results::COMPLETE;
             break;
         }
@@ -124,22 +138,24 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
 }
 
 mode::function_results mode::run_flagged_all_adc_eoc() {
-    // no default functionality
-    return function_results::CONTINUE;
+    return user_run_flagged_all_adc_eoc();
 }
 
 mode::function_results mode::soft_stop_flagged_all_adc_eoc() {
-    // no default functionality
+    requested_state = states::IDLE;
+    mtr_ch->main_output_disable();
     return function_results::COMPLETE;
 }
 
 mode::function_results mode::hard_stop_flagged_all_adc_eoc() {
-    // no default functionality
+    requested_state = states::IDLE;
+    mtr_ch->main_output_disable();
     return function_results::COMPLETE;
 }
 
 mode::function_results mode::fault_flagged_all_adc_eoc() {
-    // no default functionality
+    requested_state = states::IDLE;
+    mtr_ch->main_output_disable();
     return function_results::COMPLETE;
 }
 

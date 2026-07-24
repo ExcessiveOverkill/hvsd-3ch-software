@@ -82,6 +82,29 @@ class slew_rate_limiter {
         float output = 0.0f;
 };
 
+// Incremental (streaming) least-squares line fit: y = slope*x + intercept. Keeps only running
+// sums rather than buffering samples, so it's safe to feed one sample per PWM cycle from an
+// ISR-driven control loop for an arbitrarily long fit without growing memory.
+class linear_regression {
+    public:
+        void reset();
+        void add_sample(float x, float y);
+
+        // Undefined (returns 0.0f) if count() < 2 -- check valid() before trusting these for
+        // anything decision-relevant.
+        float slope() const;
+        float intercept() const;
+        uint32_t count() const { return n; }
+        bool valid() const { return n >= 2; }
+
+    private:
+        double sum_x = 0.0;
+        double sum_y = 0.0;
+        double sum_xy = 0.0;
+        double sum_xx = 0.0;
+        uint32_t n = 0;
+};
+
 // Stateless Clarke/Park transforms for field-oriented control. sin_theta/cos_theta are
 // expected to come from cordic::sin_cos(wrap_angle(theta), ...) - kept as explicit
 // parameters here so this file has no dependency on the CORDIC peripheral.

@@ -12,6 +12,10 @@ class mode {
         mode(motor_channel* mtr_ch_, Messaging* msg_, time_interface* time_);
         void init();
 
+        motor_channel* mtr_ch;
+        static Messaging* msg;
+        static time_interface* time;
+
         enum class states {
             IDLE,
             START,  // user logic runs here
@@ -59,9 +63,6 @@ class mode {
 
 
     private:
-        motor_channel* mtr_ch;
-        static Messaging* msg;
-        static time_interface* time;
 
         states current_state = states::IDLE;
         states requested_state = states::IDLE;
@@ -76,6 +77,8 @@ class mode {
             VERIFY_CHECKS,
             ENABLE_LOW_SIDE,
             WAIT_GATE_DRIVE_CHARGE,
+            ENABLE_HIGH_SIDE,
+            MEASURE_PHASE_ADC_ZERO_OFFSETS,
             DONE
         } start_state = pwm_startup_states::IDLE;
 

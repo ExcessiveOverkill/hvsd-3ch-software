@@ -40,6 +40,24 @@ motor_messages.add(Message("ipm_fault", MessageSeverity.ERROR, desc="IPM fault p
 
 motor_messages.add(Message("pwm_break_input_active", MessageSeverity.ERROR, desc="Break input was active during operation"))
 
+mode_messages = MessageGroup("mode", count=1)
+
+pmsm_ident_mode_messages = MessageGroup("pmsm_ident", count=1)
+pmsm_ident_mode_messages.add(Message("resistance_too_high", MessageSeverity.ERROR, desc="Unable to reach target current, resistance may be too high, voltage too low, or open circuit"))
+pmsm_ident_mode_messages.add(Message("resistance_phase_sense_imbalance", MessageSeverity.ERROR, desc="Abnormal current measured on quiet phase during resistance measurement"))
+pmsm_ident_mode_messages.add(Message("resistance_slope_mismatch", MessageSeverity.ERROR, desc="Resistance measurement slopes disagree"))
+pmsm_ident_mode_messages.add(Message("current_decay_timeout", MessageSeverity.ERROR, desc="Current did not settle to zero before starting inductance measurement"))
+pmsm_ident_mode_messages.add(Message("inductance_no_valid_resistance", MessageSeverity.WARNING, desc="No valid resistance available for inductance measurement"))
+pmsm_ident_mode_messages.add(Message("inductance_settle_timeout", MessageSeverity.ERROR, desc="Inductance measurement pass-1 settle timeout"))
+pmsm_ident_mode_messages.add(Message("inductance_fit_failure", MessageSeverity.ERROR, desc="Inductance measurement fit failed or low-confidence"))
+pmsm_ident_mode_messages.add(Message("resistance_incomplete", MessageSeverity.ERROR, desc="Resistance measurement incomplete or degraded"))
+pmsm_ident_mode_messages.add(Message("inductance_incomplete", MessageSeverity.ERROR, desc="Inductance measurement incomplete or degraded"))
+pmsm_ident_mode_messages.add(Message("align_current_not_reached", MessageSeverity.ERROR, desc="Unable to reach target current during rotor alignment, motor may be disconnected or open circuit"))
+pmsm_ident_mode_messages.add(Message("align_settle_timeout", MessageSeverity.ERROR, desc="Current failed to settle to zero during rotor alignment"))
+mode_messages.add(pmsm_ident_mode_messages)
+
+motor_messages.add(mode_messages)
+
 device.messages.append(motor_messages)
 # Global registers
 
