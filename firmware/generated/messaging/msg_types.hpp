@@ -15,8 +15,8 @@
 #endif // MSG_GET_TIME_US
 
 // --- Constants -----------------------------------------------
-constexpr uint16_t MESSAGE_COUNT = 69;
-constexpr uint16_t UNIQUE_MSG_COUNT = 29;
+constexpr uint16_t MESSAGE_COUNT = 83;
+constexpr uint16_t UNIQUE_MSG_COUNT = 35;
 
 // --- MessageId enum ------------------------------------------
 enum class MessageId : uint16_t {
@@ -30,65 +30,79 @@ enum class MessageId : uint16_t {
     MOTOR_0__IPM_THERMISTOR_FAULT = 7,
     MOTOR_0__IPM_FAULT = 8,
     MOTOR_0__PWM_BREAK_INPUT_ACTIVE = 9,
-    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 10,
-    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 11,
-    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 12,
-    MOTOR_0__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 13,
-    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 14,
-    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 15,
-    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 16,
-    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 17,
-    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 18,
-    MOTOR_0__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 19,
-    MOTOR_0__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 20,
-    MOTOR_1__OVERCURRENT_U = 21,
-    MOTOR_1__OVERCURRENT_V = 22,
-    MOTOR_1__OVERCURRENT_W = 23,
-    MOTOR_1__PHASE_IMBALANCE = 24,
-    MOTOR_1__IPM_IC_OVERTEMP = 25,
-    MOTOR_1__IPM_THERMISTOR_OVERTEMP = 26,
-    MOTOR_1__IPM_THERMISTOR_FAULT = 27,
-    MOTOR_1__IPM_FAULT = 28,
-    MOTOR_1__PWM_BREAK_INPUT_ACTIVE = 29,
-    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 30,
-    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 31,
-    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 32,
-    MOTOR_1__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 33,
-    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 34,
-    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 35,
-    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 36,
-    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 37,
-    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 38,
-    MOTOR_1__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 39,
-    MOTOR_1__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 40,
-    MOTOR_2__OVERCURRENT_U = 41,
-    MOTOR_2__OVERCURRENT_V = 42,
-    MOTOR_2__OVERCURRENT_W = 43,
-    MOTOR_2__PHASE_IMBALANCE = 44,
-    MOTOR_2__IPM_IC_OVERTEMP = 45,
-    MOTOR_2__IPM_THERMISTOR_OVERTEMP = 46,
-    MOTOR_2__IPM_THERMISTOR_FAULT = 47,
-    MOTOR_2__IPM_FAULT = 48,
-    MOTOR_2__PWM_BREAK_INPUT_ACTIVE = 49,
-    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 50,
-    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 51,
-    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 52,
-    MOTOR_2__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 53,
-    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 54,
-    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 55,
-    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 56,
-    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 57,
-    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 58,
-    MOTOR_2__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 59,
-    MOTOR_2__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 60,
-    MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE = 61,
-    MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE = 62,
-    MOTOR_ALL__VBUS_UNDERVOLTAGE = 63,
-    MOTOR_ALL__VBUS_OVERVOLTAGE = 64,
-    MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED = 65,
-    MOTOR_ALL__STO_CH1_FAULT = 66,
-    MOTOR_ALL__STO_CH2_FAULT = 67,
-    MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE = 68
+    MOTOR_0__PHASE_CAL_OFFSET_TOO_LARGE = 10,
+    MOTOR_0__NEW_ADC_DATA_NOT_AVAILABLE = 11,
+    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 12,
+    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 13,
+    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 14,
+    MOTOR_0__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 15,
+    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 16,
+    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 17,
+    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 18,
+    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 19,
+    MOTOR_0__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 20,
+    MOTOR_0__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 21,
+    MOTOR_0__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 22,
+    MOTOR_0__MODE__PMSM_IDENT__ALIGN_MECH_SETTLE_TIMEOUT = 23,
+    MOTOR_0__MODE__PMSM_IDENT__RESISTANCE_MECH_SETTLE_TIMEOUT = 24,
+    MOTOR_1__OVERCURRENT_U = 25,
+    MOTOR_1__OVERCURRENT_V = 26,
+    MOTOR_1__OVERCURRENT_W = 27,
+    MOTOR_1__PHASE_IMBALANCE = 28,
+    MOTOR_1__IPM_IC_OVERTEMP = 29,
+    MOTOR_1__IPM_THERMISTOR_OVERTEMP = 30,
+    MOTOR_1__IPM_THERMISTOR_FAULT = 31,
+    MOTOR_1__IPM_FAULT = 32,
+    MOTOR_1__PWM_BREAK_INPUT_ACTIVE = 33,
+    MOTOR_1__PHASE_CAL_OFFSET_TOO_LARGE = 34,
+    MOTOR_1__NEW_ADC_DATA_NOT_AVAILABLE = 35,
+    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 36,
+    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 37,
+    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 38,
+    MOTOR_1__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 39,
+    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 40,
+    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 41,
+    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 42,
+    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 43,
+    MOTOR_1__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 44,
+    MOTOR_1__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 45,
+    MOTOR_1__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 46,
+    MOTOR_1__MODE__PMSM_IDENT__ALIGN_MECH_SETTLE_TIMEOUT = 47,
+    MOTOR_1__MODE__PMSM_IDENT__RESISTANCE_MECH_SETTLE_TIMEOUT = 48,
+    MOTOR_2__OVERCURRENT_U = 49,
+    MOTOR_2__OVERCURRENT_V = 50,
+    MOTOR_2__OVERCURRENT_W = 51,
+    MOTOR_2__PHASE_IMBALANCE = 52,
+    MOTOR_2__IPM_IC_OVERTEMP = 53,
+    MOTOR_2__IPM_THERMISTOR_OVERTEMP = 54,
+    MOTOR_2__IPM_THERMISTOR_FAULT = 55,
+    MOTOR_2__IPM_FAULT = 56,
+    MOTOR_2__PWM_BREAK_INPUT_ACTIVE = 57,
+    MOTOR_2__PHASE_CAL_OFFSET_TOO_LARGE = 58,
+    MOTOR_2__NEW_ADC_DATA_NOT_AVAILABLE = 59,
+    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_TOO_HIGH = 60,
+    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_PHASE_SENSE_IMBALANCE = 61,
+    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_SLOPE_MISMATCH = 62,
+    MOTOR_2__MODE__PMSM_IDENT__CURRENT_DECAY_TIMEOUT = 63,
+    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_NO_VALID_RESISTANCE = 64,
+    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_SETTLE_TIMEOUT = 65,
+    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_FIT_FAILURE = 66,
+    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_INCOMPLETE = 67,
+    MOTOR_2__MODE__PMSM_IDENT__INDUCTANCE_INCOMPLETE = 68,
+    MOTOR_2__MODE__PMSM_IDENT__ALIGN_CURRENT_NOT_REACHED = 69,
+    MOTOR_2__MODE__PMSM_IDENT__ALIGN_SETTLE_TIMEOUT = 70,
+    MOTOR_2__MODE__PMSM_IDENT__ALIGN_MECH_SETTLE_TIMEOUT = 71,
+    MOTOR_2__MODE__PMSM_IDENT__RESISTANCE_MECH_SETTLE_TIMEOUT = 72,
+    MOTOR_ALL__GATE_SUPPLY_OVERVOLTAGE = 73,
+    MOTOR_ALL__GATE_SUPPLY_UNDERVOLTAGE = 74,
+    MOTOR_ALL__VBUS_UNDERVOLTAGE = 75,
+    MOTOR_ALL__VBUS_OVERVOLTAGE = 76,
+    MOTOR_ALL__ANALOG_PHASE_CURRENT_WATCHDOG_TRIGGERED = 77,
+    MOTOR_ALL__STO_CH1_FAULT = 78,
+    MOTOR_ALL__STO_CH2_FAULT = 79,
+    MOTOR_ALL__AUX_ADC_CYCLE_NOT_DONE = 80,
+    MOTOR_ALL__PHASE_ADC_SEQUENCE_DESYNC = 81,
+    MOTOR_ALL__PHASE_VREF_OFFSET_OUT_OF_RANGE = 82
 };
 
 // --- MessageSeverity enum ------------------------------------
@@ -175,6 +189,8 @@ struct _Msg_Motor_View {
     MessageId ipm_thermistor_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 6); }
     MessageId ipm_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 7); }
     MessageId pwm_break_input_active() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 8); }
+    MessageId phase_cal_offset_too_large() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 9); }
+    MessageId new_adc_data_not_available() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 10); }
 };
 
 struct _Msg_Motor_Mode_View {
@@ -194,6 +210,8 @@ struct _Msg_Motor_Mode_PmsmIdent_View {
     MessageId inductance_incomplete() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 8); }
     MessageId align_current_not_reached() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 9); }
     MessageId align_settle_timeout() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 10); }
+    MessageId align_mech_settle_timeout() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 11); }
+    MessageId resistance_mech_settle_timeout() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 12); }
 };
 
 struct _Msg_MotorAll_View {
@@ -206,6 +224,8 @@ struct _Msg_MotorAll_View {
     MessageId sto_ch1_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 5); }
     MessageId sto_ch2_fault() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 6); }
     MessageId aux_adc_cycle_not_done() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 7); }
+    MessageId phase_adc_sequence_desync() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 8); }
+    MessageId phase_vref_offset_out_of_range() const { return MessageId(static_cast<uint16_t>(base_msg_id) + 9); }
 };
 
 struct _Msg_Faults {
@@ -228,6 +248,8 @@ struct _Msg_Motor_Mode_PmsmIdent {
     MessageId inductance_incomplete;
     MessageId align_current_not_reached;
     MessageId align_settle_timeout;
+    MessageId align_mech_settle_timeout;
+    MessageId resistance_mech_settle_timeout;
 };
 
 struct _Msg_Motor_Mode {
@@ -244,30 +266,34 @@ struct _Msg_Motor {
     MessageId ipm_thermistor_fault;
     MessageId ipm_fault;
     MessageId pwm_break_input_active;
+    MessageId phase_cal_offset_too_large;
+    MessageId new_adc_data_not_available;
     _Msg_Motor_Mode mode;
 };
 
 struct _Msg_MotorAll {
-    static constexpr MessageId gate_supply_overvoltage = MessageId(61);
-    static constexpr MessageId gate_supply_undervoltage = MessageId(62);
-    static constexpr MessageId vbus_undervoltage = MessageId(63);
-    static constexpr MessageId vbus_overvoltage = MessageId(64);
-    static constexpr MessageId analog_phase_current_watchdog_triggered = MessageId(65);
-    static constexpr MessageId sto_ch1_fault = MessageId(66);
-    static constexpr MessageId sto_ch2_fault = MessageId(67);
-    static constexpr MessageId aux_adc_cycle_not_done = MessageId(68);
+    static constexpr MessageId gate_supply_overvoltage = MessageId(73);
+    static constexpr MessageId gate_supply_undervoltage = MessageId(74);
+    static constexpr MessageId vbus_undervoltage = MessageId(75);
+    static constexpr MessageId vbus_overvoltage = MessageId(76);
+    static constexpr MessageId analog_phase_current_watchdog_triggered = MessageId(77);
+    static constexpr MessageId sto_ch1_fault = MessageId(78);
+    static constexpr MessageId sto_ch2_fault = MessageId(79);
+    static constexpr MessageId aux_adc_cycle_not_done = MessageId(80);
+    static constexpr MessageId phase_adc_sequence_desync = MessageId(81);
+    static constexpr MessageId phase_vref_offset_out_of_range = MessageId(82);
 
     _Msg_MotorAll_View operator[](uint8_t idx) const {
-        return _Msg_MotorAll_View{.base_msg_id = MessageId(static_cast<uint16_t>(61) + static_cast<uint16_t>(idx) * 8)};
+        return _Msg_MotorAll_View{.base_msg_id = MessageId(static_cast<uint16_t>(73) + static_cast<uint16_t>(idx) * 10)};
     }
 };
 
 struct _Msg {
     static constexpr _Msg_Faults faults{};
     static constexpr _Msg_Motor motor[3] = {
-        { MessageId(1), MessageId(2), MessageId(3), MessageId(4), MessageId(5), MessageId(6), MessageId(7), MessageId(8), MessageId(9), { { MessageId(10), MessageId(11), MessageId(12), MessageId(13), MessageId(14), MessageId(15), MessageId(16), MessageId(17), MessageId(18), MessageId(19), MessageId(20) } } },
-        { MessageId(21), MessageId(22), MessageId(23), MessageId(24), MessageId(25), MessageId(26), MessageId(27), MessageId(28), MessageId(29), { { MessageId(30), MessageId(31), MessageId(32), MessageId(33), MessageId(34), MessageId(35), MessageId(36), MessageId(37), MessageId(38), MessageId(39), MessageId(40) } } },
-        { MessageId(41), MessageId(42), MessageId(43), MessageId(44), MessageId(45), MessageId(46), MessageId(47), MessageId(48), MessageId(49), { { MessageId(50), MessageId(51), MessageId(52), MessageId(53), MessageId(54), MessageId(55), MessageId(56), MessageId(57), MessageId(58), MessageId(59), MessageId(60) } } },
+        { MessageId(1), MessageId(2), MessageId(3), MessageId(4), MessageId(5), MessageId(6), MessageId(7), MessageId(8), MessageId(9), MessageId(10), MessageId(11), { { MessageId(12), MessageId(13), MessageId(14), MessageId(15), MessageId(16), MessageId(17), MessageId(18), MessageId(19), MessageId(20), MessageId(21), MessageId(22), MessageId(23), MessageId(24) } } },
+        { MessageId(25), MessageId(26), MessageId(27), MessageId(28), MessageId(29), MessageId(30), MessageId(31), MessageId(32), MessageId(33), MessageId(34), MessageId(35), { { MessageId(36), MessageId(37), MessageId(38), MessageId(39), MessageId(40), MessageId(41), MessageId(42), MessageId(43), MessageId(44), MessageId(45), MessageId(46), MessageId(47), MessageId(48) } } },
+        { MessageId(49), MessageId(50), MessageId(51), MessageId(52), MessageId(53), MessageId(54), MessageId(55), MessageId(56), MessageId(57), MessageId(58), MessageId(59), { { MessageId(60), MessageId(61), MessageId(62), MessageId(63), MessageId(64), MessageId(65), MessageId(66), MessageId(67), MessageId(68), MessageId(69), MessageId(70), MessageId(71), MessageId(72) } } },
     };
     static constexpr _Msg_MotorAll motor_all{};
 };

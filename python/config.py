@@ -40,6 +40,10 @@ motor_messages.add(Message("ipm_fault", MessageSeverity.ERROR, desc="IPM fault p
 
 motor_messages.add(Message("pwm_break_input_active", MessageSeverity.ERROR, desc="Break input was active during operation"))
 
+motor_messages.add(Message("phase_cal_offset_too_large", MessageSeverity.CRITICAL, desc="Phase current sense calibration offset too large"))
+
+motor_messages.add(Message("new_adc_data_not_available", MessageSeverity.CRITICAL, desc="New ADC data not available"))
+
 mode_messages = MessageGroup("mode", count=1)
 
 pmsm_ident_mode_messages = MessageGroup("pmsm_ident", count=1)
@@ -54,6 +58,8 @@ pmsm_ident_mode_messages.add(Message("resistance_incomplete", MessageSeverity.ER
 pmsm_ident_mode_messages.add(Message("inductance_incomplete", MessageSeverity.ERROR, desc="Inductance measurement incomplete or degraded"))
 pmsm_ident_mode_messages.add(Message("align_current_not_reached", MessageSeverity.ERROR, desc="Unable to reach target current during rotor alignment, motor may be disconnected or open circuit"))
 pmsm_ident_mode_messages.add(Message("align_settle_timeout", MessageSeverity.ERROR, desc="Current failed to settle to zero during rotor alignment"))
+pmsm_ident_mode_messages.add(Message("align_mech_settle_timeout", MessageSeverity.ERROR, desc="Rotor motion/BEMF never confirmed settled before resistance measurement began"))
+pmsm_ident_mode_messages.add(Message("resistance_mech_settle_timeout", MessageSeverity.ERROR, desc="Rotor motion/BEMF never confirmed settled between resistance test levels"))
 mode_messages.add(pmsm_ident_mode_messages)
 
 motor_messages.add(mode_messages)
@@ -76,6 +82,10 @@ all_motor_messages.add(Message("sto_ch1_fault", MessageSeverity.ERROR, desc="STO
 all_motor_messages.add(Message("sto_ch2_fault", MessageSeverity.ERROR, desc="STO channel 2 fault detected"))
 
 all_motor_messages.add(Message("aux_adc_cycle_not_done", MessageSeverity.CRITICAL, desc="Aux ADC never completed a cycle in timeout period"))
+
+all_motor_messages.add(Message("phase_adc_sequence_desync", MessageSeverity.CRITICAL, desc="Phase ADC round-robin sequence desynced from software index, a reading was discarded"))
+
+all_motor_messages.add(Message("phase_vref_offset_out_of_range", MessageSeverity.CRITICAL, desc="Phase current sense vref is out of range"))
 
 device.messages.append(all_motor_messages)
 

@@ -61,6 +61,9 @@ class motor_channel {
         static bool aux_adc_cycle_complete() { return aux_adc_data_ready; }
         _Msg_Motor get_motor_msgs() { return motor_msgs; }
 
+        bool get_new_phase_adc_data_available() { return new_phase_adc_data_available; }
+        void clear_new_phase_adc_data_available() { new_phase_adc_data_available = false; }
+
     private:
 
         static Messaging* msg;

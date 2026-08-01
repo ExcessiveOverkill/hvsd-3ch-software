@@ -61,19 +61,24 @@ void motor_channel::phase_adc_init() {
         uint64_t start_time = time->get_microseconds_update();
         while(time->get_microseconds_update() < start_time+10e3){} // wait 10ms for vref/2 to stabilize, based on board hardware testing
 
+        uint8_t vref_cal_flags = 0;
 
         // configure ADCs
         for (ADC_TypeDef* adc : adcs) {
 
             power_on_adc(adc);
 
-            // set ADC regular conversion sequence to handle 3 channels
-            adc->SQR1 = 2 << ADC_SQR1_L_Pos; // 3 conversions in the sequence
-            
-            // enable discontinuous mode to only do one channel per trigger
+            // Only one channel is ever "in the sequence" at a time -- which physical motor
+            // channel's phase pin that is gets rewritten explicitly every round-robin cycle (see
+            // enable_phase_adc_timer_trigger()), rather than relying on a persistent 3-slot
+            // discontinuous sequence auto-advancing through fixed per-channel slots. That older
+            // scheme required 3 independent ADC peripherals to each silently track their own
+            // internal "which slot is next" position and stay in lockstep with each other and
+            // with software indefinitely, with no way to read that position back -- a real
+            // desync of that hidden state was the root cause of one motor channel's current
+            // occasionally showing up attributed to a different motor_channel instance.
+            adc->SQR1 = 0 << ADC_SQR1_L_Pos; // 1 conversion in the sequence (no discontinuous mode needed)
             adc->CFGR &= ~ADC_CFGR_CONT; // disable continuous mode
-            adc->CFGR |= ADC_CFGR_DISCEN;   // enable discontinuous mode
-            adc->CFGR &= ~ADC_CFGR_DISCNUM; // 1 conversion in discontinuous sequence
 
             adc->CFGR |= ADC_CFGR_OVRMOD; // enable overrun mode to overwrite old data if not read in time
 
@@ -101,21 +106,33 @@ void motor_channel::phase_adc_init() {
 
             // get vref half offset for each phase ADC
             uint16_t phase_offset = 0;
+
+            uint16_t min_vref = 32768 - 32768/20; // 5% below ideal vref/2
+            uint16_t max_vref = 32768 + 32768/20; // 5% above ideal vref/2
+
             enable_phase_adcs();
             if(adc == board_hw::phase_u_adc){
                     phase_u_vref_offset = get_adc_reading_blocking(adc, board_hw::vref_half_0_adc_channel);
                     phase_offset = phase_u_vref_offset;
+                    if(phase_u_vref_offset < min_vref || phase_u_vref_offset > max_vref){
+                        vref_cal_flags |= 1 << 0; // phase offset out of range
+                    }
             }
             else if(adc == board_hw::phase_v_adc){
                     phase_v_vref_offset = get_adc_reading_blocking(adc, board_hw::vref_half_1_adc_channel);
                     phase_offset = phase_v_vref_offset;
+                    if(phase_v_vref_offset < min_vref || phase_v_vref_offset > max_vref){
+                        vref_cal_flags |= 1 << 1; // phase offset out of range
+                    }
             }
             else if(adc == board_hw::phase_w_adc){
                     phase_w_vref_offset = get_adc_reading_blocking(adc, board_hw::vref_half_2_adc_channel);
                     phase_offset = phase_w_vref_offset;
+                    if(phase_w_vref_offset < min_vref || phase_w_vref_offset > max_vref){
+                        vref_cal_flags |= 1 << 2; // phase offset out of range
+                    }
             }
             disable_phase_adcs();
-
 
             // watchdog config
             uint32_t channels = (1u << config->phase_u_adc_channel) | (1u << config->phase_v_adc_channel) | (1u << config->phase_w_adc_channel);
@@ -140,6 +157,10 @@ void motor_channel::phase_adc_init() {
             NVIC_EnableIRQ(irq);
         }
 
+        if(vref_cal_flags != 0){
+            msg->add(msgs.motor_all.phase_vref_offset_out_of_range, vref_cal_flags);
+        }
+
         vbus_sense_adc_init();
         aux_adc_init();
     
@@ -152,34 +173,9 @@ void motor_channel::phase_adc_init() {
     gpio_ll::configure_analog({config->phase_v_adc_port, config->phase_v_adc_pin});
     gpio_ll::configure_analog({config->phase_w_adc_port, config->phase_w_adc_pin});
 
-    
-    // configure channel sample sequence, always goes in the channel number order
-    uint8_t sequence_offset = 0;
-    uint32_t sequence_mask = 0;
-    switch (channel_num) {
-        case 0:
-            sequence_offset = ADC_SQR1_SQ1_Pos;
-            sequence_mask = ADC_SQR1_SQ1_Msk;
-            break;
-        case 1:
-            sequence_offset = ADC_SQR1_SQ2_Pos;
-            sequence_mask = ADC_SQR1_SQ2_Msk;
-            break;
-        case 2:
-            sequence_offset = ADC_SQR1_SQ3_Pos;
-            sequence_mask = ADC_SQR1_SQ3_Msk;
-            break;
-        default:
-            // TODO: add fault handler
-            while(1){}
-    }
 
-    board_hw::phase_u_adc->SQR1 = (board_hw::phase_u_adc->SQR1 & ~sequence_mask)
-                                | (static_cast<uint32_t>(config->phase_u_adc_channel) << sequence_offset);
-    board_hw::phase_v_adc->SQR1 = (board_hw::phase_v_adc->SQR1 & ~sequence_mask)
-                                | (static_cast<uint32_t>(config->phase_v_adc_channel) << sequence_offset);
-    board_hw::phase_w_adc->SQR1 = (board_hw::phase_w_adc->SQR1 & ~sequence_mask)
-                                | (static_cast<uint32_t>(config->phase_w_adc_channel) << sequence_offset);
+    // No permanent SQR1.SQ1 assignment here -- which motor channel's phase pin is selected into
+    // SQ1 is rewritten every round-robin cycle in enable_phase_adc_timer_trigger() instead.
 
     // Ensure each used phase channel has an explicit sample time across all motor configs.
     uint32_t phase_cycles = 2;
@@ -502,14 +498,26 @@ void motor_channel::configure_adc_sample_time(ADC_TypeDef* adc, uint32_t channel
 }
 
 void motor_channel::enable_phase_adc_timer_trigger(){
-    // enable hardware trigger from timer for ADC conversions to synchronize with PWM
-    // only one timer can be selected at a time, so this must be called after each ADC sample to move to the next motor
+    // Select this motor channel's phase pins into SQ1 (the only slot -- see phase_adc_init(),
+    // no discontinuous multi-slot sequence anymore) and arm the hardware trigger from this
+    // channel's own PWM timer, synchronizing ADC conversions with PWM. Only one channel/timer
+    // can be selected at a time, so this must be called after each ADC sample to move to the
+    // next motor -- and must only be called while ADSTART=0 for all 3 ADCs (guaranteed by the
+    // caller having already called disable_phase_adc_timer_trigger()), since RM0440 requires
+    // SQR1/EXTSEL/EXTEN to only be written when no regular conversion is ongoing.
+    board_hw::phase_u_adc->SQR1 = (board_hw::phase_u_adc->SQR1 & ~ADC_SQR1_SQ1_Msk) | (static_cast<uint32_t>(config->phase_u_adc_channel) << ADC_SQR1_SQ1_Pos);
+    board_hw::phase_v_adc->SQR1 = (board_hw::phase_v_adc->SQR1 & ~ADC_SQR1_SQ1_Msk) | (static_cast<uint32_t>(config->phase_v_adc_channel) << ADC_SQR1_SQ1_Pos);
+    board_hw::phase_w_adc->SQR1 = (board_hw::phase_w_adc->SQR1 & ~ADC_SQR1_SQ1_Msk) | (static_cast<uint32_t>(config->phase_w_adc_channel) << ADC_SQR1_SQ1_Pos);
+
     board_hw::phase_u_adc->CFGR = (board_hw::phase_u_adc->CFGR & ~ADC_CFGR_EXTSEL) | (config->phase_u_adc_timer_reg_extsel << ADC_CFGR_EXTSEL_Pos) | ADC_CFGR_EXTEN_0; // rising edge trigger
     board_hw::phase_v_adc->CFGR = (board_hw::phase_v_adc->CFGR & ~ADC_CFGR_EXTSEL) | (config->phase_v_adc_timer_reg_extsel << ADC_CFGR_EXTSEL_Pos) | ADC_CFGR_EXTEN_0; // rising edge trigger
     board_hw::phase_w_adc->CFGR = (board_hw::phase_w_adc->CFGR & ~ADC_CFGR_EXTSEL) | (config->phase_w_adc_timer_reg_extsel << ADC_CFGR_EXTSEL_Pos) | ADC_CFGR_EXTEN_0; // rising edge trigger
 
+    // Per RM0440 (regular hardware-trigger operation): a fresh ADSTART=1 must be set for every
+    // conversion -- it does not force an immediate conversion (a real hardware trigger edge on
+    // EXTSEL is still required), it only arms the trigger detector for the next edge. Omitting
+    // this causes the ADC to permanently ignore all further hardware trigger edges.
     manual_phase_adc_trigger();
-
 }
 
 void motor_channel::disable_phase_adc_timer_trigger(){
@@ -534,7 +542,12 @@ void motor_channel::disable_phase_adc_timer_trigger(){
 }
 
 void motor_channel::manual_phase_adc_trigger() {
-    // trigger ADC conversion manually in software, used when timer trigger is disabled
+    // Arms ADSTART for all 3 phase ADCs. With EXTEN configured for a hardware trigger, this does
+    // NOT itself force a conversion -- it only re-arms the trigger detector for the next hardware
+    // edge on the currently-selected EXTSEL source. Required after every round-robin channel
+    // switch (called from enable_phase_adc_timer_trigger()) since ADSTART auto-clears once the
+    // prior conversion completes, and also used standalone to bootstrap the very first conversion
+    // before any timer has reached its compare point (see device::force_restart_pwm_timers()).
     if(!(board_hw::phase_u_adc->CR & ADC_CR_ADSTART)) {
         board_hw::phase_u_adc->CR |= ADC_CR_ADSTART; // start conversion
     }
@@ -621,7 +634,8 @@ void motor_channel::timer_init() {
     config->timer->CCMR2 |= 0b0111 << TIM_CCMR2_OC3M_Pos; // set output compare 3 mode to PWM mode 2
 
     config->timer->CCMR2 |= 0b1 << TIM_CCMR2_OC4PE_Pos; // enable output compare 4 preload (used for triggering ADC)
-    config->timer->CCMR2 |= 0b0111 << TIM_CCMR2_OC4M_Pos; // set output compare 4 mode to PWM mode 2
+    // config->timer->CCMR2 |= 0b0111 << TIM_CCMR2_OC4M_Pos; // set output compare 4 mode to PWM mode 2
+    config->timer->CCMR2 |= 0b0110 << TIM_CCMR2_OC4M_Pos; // set output compare 4 mode to PWM mode 1
 
     config->timer->CCER |= 0b0 << TIM_CCER_CC1P_Pos; // set output compare 1 polarity to active high
     config->timer->CCER |= 0b0 << TIM_CCER_CC2P_Pos; // set output compare 2 polarity to active high
@@ -870,7 +884,8 @@ void motor_channel::set_pwm_frequency(float frequency_hz, float* resulting_frequ
 
     phase_adc_trigger_offset = 10;    // TODO: calc based on ADC sample/conversion time and oversampling
 
-    config->timer->CCR4 = calc_arr - phase_adc_trigger_offset; // ensure offset is within the new ARR range
+    // config->timer->CCR4 = calc_arr - phase_adc_trigger_offset; // ensure offset is within the new ARR range
+    config->timer->CCR4 = phase_adc_trigger_offset;
 }
 
 void motor_channel::enable_phase_adcs() {
@@ -934,34 +949,46 @@ void motor_channel::all_phase_adc_eoc_flagged_handler() {
     // read vbus
     trigger_vbus_sense_adc_reading();
 
+    // Verify each ADC's SQR1.SQ1 (the only slot -- see phase_adc_init(), no more persistent
+    // 3-slot discontinuous sequence) still selects THIS channel's phase pin, and that no
+    // conversion was silently overwritten by an overrun, BEFORE trusting/storing the DR read
+    // below. SQR1.SQ1 is the live, software-readable record of which channel each ADC is
+    // currently armed to convert -- reading it back directly verifies the actual hardware
+    // channel-selection state, rather than inferring it indirectly from flag timing the way the
+    // old 3-slot-sequence scheme had to (with no way to query its hidden internal position).
+    uint8_t mismatch_flags = 0;
+    mismatch_flags |= (((board_hw::phase_u_adc->SQR1 & ADC_SQR1_SQ1_Msk) >> ADC_SQR1_SQ1_Pos) != static_cast<uint32_t>(config->phase_u_adc_channel)) ? (1 << 0) : 0;
+    mismatch_flags |= (((board_hw::phase_v_adc->SQR1 & ADC_SQR1_SQ1_Msk) >> ADC_SQR1_SQ1_Pos) != static_cast<uint32_t>(config->phase_v_adc_channel)) ? (1 << 1) : 0;
+    mismatch_flags |= (((board_hw::phase_w_adc->SQR1 & ADC_SQR1_SQ1_Msk) >> ADC_SQR1_SQ1_Pos) != static_cast<uint32_t>(config->phase_w_adc_channel)) ? (1 << 2) : 0;
+
+    // ADC_CFGR_OVRMOD is enabled, so an overrun means the main loop fell behind the PWM-rate ADC
+    // cadence and DR may hold a stale/skipped sample rather than this cycle's conversion.
+    bool overrun = (board_hw::phase_u_adc->ISR & ADC_ISR_OVR) || (board_hw::phase_v_adc->ISR & ADC_ISR_OVR) || (board_hw::phase_w_adc->ISR & ADC_ISR_OVR);
+    mismatch_flags |= overrun ? (1 << 3) : 0;
+
+    // clear end of sequence and overrun flags (EOS now fires on every conversion, since there's
+    // only ever one channel in the sequence -- end-of-sequence is end-of-conversion here)
+    board_hw::phase_u_adc->ISR = ADC_ISR_EOS | ADC_ISR_OVR;
+    board_hw::phase_v_adc->ISR = ADC_ISR_EOS | ADC_ISR_OVR;
+    board_hw::phase_w_adc->ISR = ADC_ISR_EOS | ADC_ISR_OVR;
+
+    if(mismatch_flags != 0) {
+        // The DR registers may hold a different channel's conversion (or a stale/overwritten
+        // one) than expected -- skip storing this reading rather than risk misattributing it to
+        // the wrong motor_channel instance, resync the index, and report the condition (payload:
+        // bit0/1/2 = U/V/W channel-selection mismatch, bit3 = overrun detected).
+        msg->add(msgs.motor_all.phase_adc_sequence_desync, mismatch_flags);
+        phase_adc_sample_index = 0; // reset to 0 to avoid getting stuck in an error state
+        new_phase_adc_data_available = false;
+        return;
+    }
+
     // read ADC results
     phase_u_current = calculate_phase_current(board_hw::phase_u_adc->DR << phase_adc_result_left_shift, phase_u_adc_offset, phase_u_vref_offset);
     phase_v_current = calculate_phase_current(board_hw::phase_v_adc->DR << phase_adc_result_left_shift, phase_v_adc_offset, phase_v_vref_offset);
     phase_w_current = calculate_phase_current(board_hw::phase_w_adc->DR << phase_adc_result_left_shift, phase_w_adc_offset, phase_w_vref_offset);
 
     phase_adc_sample_index = (phase_adc_sample_index + 1) % num_of_channels;
-
-    // verify sequences are in sync and match adc_sample_index
-    uint8_t end_of_sequence_flags = 0;
-    end_of_sequence_flags |= (board_hw::phase_u_adc->ISR & ADC_ISR_EOS) ? (1 << 0) : 0;
-    end_of_sequence_flags |= (board_hw::phase_v_adc->ISR & ADC_ISR_EOS) ? (1 << 1) : 0;
-    end_of_sequence_flags |= (board_hw::phase_w_adc->ISR & ADC_ISR_EOS) ? (1 << 2) : 0;
-
-    if((end_of_sequence_flags != 0) && (end_of_sequence_flags != 0b111)) {
-        // sequences are not in sync, TODO: handle error
-        while(1){}
-    }
-
-    if(end_of_sequence_flags && (phase_adc_sample_index != 0)) {
-        // end of sequence flag is set but adc_sample_index is not 0, TODO: handle error
-        // while(1){}
-        phase_adc_sample_index = 0; // reset to 0 to avoid getting stuck in an error state
-    }
-
-    // clear end of sequence flags
-    board_hw::phase_u_adc->ISR = ADC_ISR_EOS;
-    board_hw::phase_v_adc->ISR = ADC_ISR_EOS;
-    board_hw::phase_w_adc->ISR = ADC_ISR_EOS;
 
     new_phase_adc_data_available = true;
 }
@@ -1033,6 +1060,10 @@ bool motor_channel::phase_adcs_enabled() {
 bool motor_channel::global_safety_checks() {
     // check global safety conditions that apply to all motor channels
     bool safety_ok = true;
+
+    if(!aux_adc_data_ready){
+        return true; // aux ADC data not ready yet, skip safety checks
+    }
 
     // gate undervoltage
     if(gate_supply_voltage < board_hw::ipms.min_gate_supply_voltage) {
@@ -1192,6 +1223,20 @@ void motor_channel::zero_phase_adcs() {
     phase_u_adc_offset = static_cast<int32_t>(board_hw::phase_u_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_u_vref_offset);
     phase_v_adc_offset = static_cast<int32_t>(board_hw::phase_v_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_v_vref_offset);
     phase_w_adc_offset = static_cast<int32_t>(board_hw::phase_w_adc->DR << phase_adc_result_left_shift) - static_cast<int32_t>(phase_w_vref_offset);
+
+    constexpr int16_t offset_min_limit = -32768/20; // 5%
+    constexpr int16_t offset_max_limit = 32768/20;  // 5%
+    bool u_offset_out_of_range = (phase_u_adc_offset < offset_min_limit) || (phase_u_adc_offset > offset_max_limit);
+    bool v_offset_out_of_range = (phase_v_adc_offset < offset_min_limit) || (phase_v_adc_offset > offset_max_limit);
+    bool w_offset_out_of_range = (phase_w_adc_offset < offset_min_limit) || (phase_w_adc_offset > offset_max_limit);
+
+    uint8_t flags = u_offset_out_of_range ? (1 << 0) : 0;
+    flags |= v_offset_out_of_range ? (1 << 1) : 0;
+    flags |= w_offset_out_of_range ? (1 << 2) : 0;
+
+    if(flags != 0) {
+        msg->add(motor_msgs.phase_cal_offset_too_large, flags);
+    }
 }
 
 float motor_channel::calculate_phase_current(uint16_t adc_value, int16_t adc_offset, uint16_t adc_vref_2_offset) {

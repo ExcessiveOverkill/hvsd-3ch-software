@@ -19,6 +19,14 @@ void mode::flagged_timer_update(){
 }
 
 void mode::flagged_all_adc_eoc(){
+    if(current_state != states::IDLE){
+        mtr_ch->global_safety_checks();
+        mtr_ch->channel_safety_checks();
+        if(msg->get_active_severity() >= MessageSeverity::ERROR) {
+            requested_state = states::IDLE;
+            current_state = states::HARD_STOP;
+        }
+    }
     switch (current_state) {
         case states::IDLE:
             next_state(idle_flagged_all_adc_eoc());
@@ -129,6 +137,7 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
         case pwm_startup_states::DONE:
         {
             mtr_ch->set_scaled_pwm_values(-1.0f, -1.0f, -1.0f); // set all phases to 0% duty cycle
+            // mtr_ch->set_scaled_pwm_values(0.0f, 0.0f, 0.0f);    // testing
             return function_results::COMPLETE;
             break;
         }
@@ -138,6 +147,7 @@ mode::function_results mode::start_flagged_all_adc_eoc() {
 }
 
 mode::function_results mode::run_flagged_all_adc_eoc() {
+    // return function_results::CONTINUE;  // force to keep running for testing only
     return user_run_flagged_all_adc_eoc();
 }
 

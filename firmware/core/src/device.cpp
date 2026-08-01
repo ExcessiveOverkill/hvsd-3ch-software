@@ -192,7 +192,7 @@ void device::init() {
         // other modes can be added here in the future
 
 
-        // channel_current_mode_instance[i] = &channel_modes[i].none;  // set to default mode
+        channel_current_mode_instance[i] = &channel_modes[i].none;  // set to default mode
         
         channel_current_mode_instance[i] = &channel_modes[i].pmsm_ident;  // for testing
         
@@ -206,6 +206,8 @@ void device::init() {
 
     
     channel_current_mode_instance[0]->set_requested_state(mode::states::RUN);
+    // channel_current_mode_instance[1]->set_requested_state(mode::states::RUN);
+    // channel_current_mode_instance[2]->set_requested_state(mode::states::RUN);
 
 }
 
@@ -372,7 +374,7 @@ bool device::force_restart_pwm_timers(float frequency_hz) {
     motor_channel::enable_phase_adcs();
     motor_channel::enable_aux_adc();
 
-    motor_channels[0].enable_phase_adc_timer_trigger();   // channel 0 will trigger ADCs first, IRQ handler will switch to the next channel's ADC trigger after all 3 ADCs have completed a conversion
+    motor_channels[0].enable_phase_adc_timer_trigger();   // channel 0 will trigger ADCs first (this also arms ADSTART -- see enable_phase_adc_timer_trigger()); IRQ handler will switch to the next channel's ADC trigger after all 3 ADCs have completed a conversion
     motor_channel::manual_aux_adc_trigger(); // trigger auxiliary ADC to start sampling
 
     // TODO: optional to start timers at a specific sync timer count, for now just start immediately

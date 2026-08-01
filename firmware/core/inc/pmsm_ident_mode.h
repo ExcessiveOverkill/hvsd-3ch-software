@@ -24,7 +24,7 @@ class pmsm_ident_mode : public mode {
         float measured_commutation_offset = 0.0f;   // radians
         float measured_back_emf = 0.0f; // v / 1000 rpm
 
-        float motor_calibration_current = 0.2f; // amps
+        float motor_calibration_current = 3.0f; // amps
 
         void user_reset() override;
 
@@ -88,7 +88,7 @@ class pmsm_ident_mode : public mode {
         // be bench-tuned against real motor/PID behavior before this mode is used on hardware.
         // Declared before the control objects below since some of their constructor arguments
         // (max_ident_test_voltage) depend on these being already default-initialized. ----
-        static constexpr float pid_kp = 0.5f;   // TODO: bench tune against actual R/L
+        static constexpr float pid_kp = 1.0f;   // TODO: bench tune against actual R/L
         static constexpr float pid_ki = 50.0f;  // TODO: bench tune
         static constexpr float pid_kd = 0.0f;   // derivative-on-measurement rarely needed for a resistive/RL plant
 
@@ -100,18 +100,23 @@ class pmsm_ident_mode : public mode {
         static constexpr uint8_t num_test_levels = 4;
 
         static constexpr uint32_t align_ramp_hold_us      = 1000e3; // hold at align current, each polarity
-        static constexpr uint32_t align_mech_settle_us    = 1000e3; // wait for velocity to damp after align
+        static constexpr uint32_t align_mech_settle_us    = 1000e3; // minimum dwell before the settle-confirmation window below even starts counting
+        static constexpr uint32_t align_mech_settle_timeout_us = 3000e3; // safety cap if motion/BEMF never confirms settled -- reported, not fatal
         static constexpr uint32_t current_ramp_settle_us  = 100e3;  // settle after PID reaches new level, before sampling
         static constexpr uint32_t sample_average_us       = 20e3;  // averaging window per regression sample
         static constexpr uint32_t pair_timeout_us         = 1000e3; // max time saturated-without-reaching-target before pair invalid
         static constexpr uint32_t ramp_to_zero_timeout_us = 300e3;
+        static constexpr uint32_t resistance_mech_settle_timeout_us = 2000e3; // safety cap per level/pair transition if motion never confirms settled -- reported, not fatal
         static constexpr uint32_t inductance_settle_timeout_us = 200e3; // pass-1 timeout waiting for Iss
         static constexpr uint32_t inductance_ramp_down_us      = 50e3;
 
         static constexpr float reach_target_tolerance_amps = 0.05f;  // TODO: bench tune vs current_filter noise
         static constexpr float zero_current_tolerance_amps = 0.05f;
         static constexpr float imbalance_fraction_threshold = 0.10f; // quiet-phase current vs loop current, fraction
+        static constexpr float resistance_slope_mismatch_fraction_threshold = 0.20f; // relative disagreement between the +/- polarity slope fits, TODO: bench tune
         static constexpr float imbalance_min_loop_current = 0.5f;    // amps; ignore imbalance check below this loop current (noise floor)
+        static constexpr uint8_t align_mech_settle_consecutive_samples = 50; // consecutive near-zero-current cycles required to confirm the rotor has actually stopped, not just "time has passed"
+        static constexpr uint8_t resistance_mech_settle_consecutive_samples = 30; // same idea, applied at every level/pair transition below -- driving current along a different phase-pair axis than the one ALIGN settled on can torque the rotor, so each transition needs its own settle confirmation, not just the one at the very start
         static constexpr uint8_t inductance_skip_cycles = 2;         // skip first N cycles of pass-2 transient (switching/ADC-sync artifacts)
         static constexpr float inductance_log_cutoff_frac = 0.05f;   // stop regression once (Iss-I) < 5% of Iss (log-domain noise)
         static constexpr float inductance_settle_delta_threshold_amps = 0.02f; // successive-sample delta, absolute
@@ -123,10 +128,12 @@ class pmsm_ident_mode : public mode {
         // cached cycle-count versions of the *_us constants above, computed once in configure_control_objects()
         uint32_t align_ramp_hold_cycles = 0;
         uint32_t align_mech_settle_cycles = 0;
+        uint32_t align_mech_settle_timeout_cycles = 0;
         uint32_t current_ramp_settle_cycles = 0;
         uint32_t sample_average_cycles = 0;
         uint32_t pair_timeout_cycles = 0;
         uint32_t ramp_to_zero_timeout_cycles = 0;
+        uint32_t resistance_mech_settle_timeout_cycles = 0;
         uint32_t inductance_settle_timeout_cycles = 0;
         uint32_t inductance_ramp_down_cycles = 0;
 
@@ -148,6 +155,7 @@ class pmsm_ident_mode : public mode {
         // spinning rotor would corrupt the DC-ish current measurements below. ----
         enum class align_state : uint8_t { RAMP_POS, HOLD_POS, RAMP_NEG, HOLD_NEG, RAMP_ZERO, MECH_SETTLE, DONE };
         align_state a_state = align_state::RAMP_POS;
+        uint32_t mech_settled_count = 0; // consecutive near-zero-current cycles seen so far in MECH_SETTLE
 
         // generic "cycles spent in the current sub-state" counter, reused (reset to 0 on every
         // sub-state transition) across all three stages below
@@ -164,11 +172,13 @@ class pmsm_ident_mode : public mode {
         uint8_t level_index = 0;
         int8_t polarity = 1; // +1 then -1
         uint32_t saturation_cycle_counter = 0; // consecutive cycles at/near the output clamp -- drives open-phase/timeout detection
+        uint32_t resistance_mech_settled_count = 0; // consecutive near-zero-current cycles seen so far in RAMP_TO_ZERO
         bool pair_timed_out = false;
         bool pair_measurement_complete = false;
         float r_pos_slope = 0.0f; // stashed after the +polarity sweep, before regression.reset() for -polarity
         float sample_i_accum = 0.0f;
         float sample_v_accum = 0.0f;
+        float sample_quiet_i_accum = 0.0f; // accumulated alongside sample_i_accum/sample_v_accum for the settled-window imbalance check
         uint32_t sample_accum_count = 0;
 
         // ---- INDUCTANCE sub-state: two-pass step response. Pass 1 measures Iss directly (making

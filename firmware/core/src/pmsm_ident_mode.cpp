@@ -25,10 +25,12 @@ void pmsm_ident_mode::configure_control_objects() {
 
     align_ramp_hold_cycles           = mtr_ch->calculate_pwm_cycles_from_us(align_ramp_hold_us);
     align_mech_settle_cycles         = mtr_ch->calculate_pwm_cycles_from_us(align_mech_settle_us);
+    align_mech_settle_timeout_cycles = mtr_ch->calculate_pwm_cycles_from_us(align_mech_settle_timeout_us);
     current_ramp_settle_cycles       = mtr_ch->calculate_pwm_cycles_from_us(current_ramp_settle_us);
     sample_average_cycles            = mtr_ch->calculate_pwm_cycles_from_us(sample_average_us);
     pair_timeout_cycles              = mtr_ch->calculate_pwm_cycles_from_us(pair_timeout_us);
     ramp_to_zero_timeout_cycles      = mtr_ch->calculate_pwm_cycles_from_us(ramp_to_zero_timeout_us);
+    resistance_mech_settle_timeout_cycles = mtr_ch->calculate_pwm_cycles_from_us(resistance_mech_settle_timeout_us);
     inductance_settle_timeout_cycles = mtr_ch->calculate_pwm_cycles_from_us(inductance_settle_timeout_us);
     inductance_ramp_down_cycles      = mtr_ch->calculate_pwm_cycles_from_us(inductance_ramp_down_us);
 }
@@ -36,6 +38,7 @@ void pmsm_ident_mode::configure_control_objects() {
 void pmsm_ident_mode::user_reset() {
     stage = ident_stage::ALIGN;
     a_state = align_state::RAMP_POS;
+    mech_settled_count = 0;
     r_state = resistance_state::RAMP_TO_LEVEL;
     l_state = inductance_state::SETTLE_ZERO;
 
@@ -43,11 +46,13 @@ void pmsm_ident_mode::user_reset() {
     level_index = 0;
     polarity = 1;
     saturation_cycle_counter = 0;
+    resistance_mech_settled_count = 0;
     pair_timed_out = false;
     pair_measurement_complete = false;
     r_pos_slope = 0.0f;
     sample_i_accum = 0.0f;
     sample_v_accum = 0.0f;
+    sample_quiet_i_accum = 0.0f;
     sample_accum_count = 0;
 
     inductance_measuring_iss = true;
@@ -231,10 +236,32 @@ mode::function_results pmsm_ident_mode::run_align_stage() {
         }
         case align_state::MECH_SETTLE:
         {
+            // A fixed dwell alone doesn't confirm the rotor has actually stopped -- residual
+            // motion/BEMF with 0V commanded would still show up as nonzero loop_i and/or quiet_i.
+            // Require align_mech_settle_cycles as a minimum dwell (avoids false-settling on a
+            // single lucky sample right after RAMP_ZERO), then require both currents to stay near
+            // zero for align_mech_settle_consecutive_samples in a row before calling it settled,
+            // with an absolute timeout so a rotor that never settles doesn't hang the mode.
             command_pair_voltage(phase_pair::UV, 0.0f);
             state_cycle_counter++;
+
             if(state_cycle_counter >= align_mech_settle_cycles) {
-                a_state = align_state::DONE;
+                bool near_zero = std::fabs(filtered_i) < zero_current_tolerance_amps && std::fabs(quiet_i) < zero_current_tolerance_amps;
+                if(near_zero) {
+                    mech_settled_count++;
+                } else {
+                    mech_settled_count = 0;
+                }
+
+                if(mech_settled_count >= align_mech_settle_consecutive_samples) {
+                    a_state = align_state::DONE;
+                } else if(state_cycle_counter >= align_mech_settle_timeout_cycles) {
+                    // Motion/BEMF never confirmed settled -- report and proceed anyway rather than
+                    // hang; the resistance stage's own settled-window imbalance check will still
+                    // catch and report any lingering effect on the actual measurement.
+                    msg->add(mode_msgs.align_mech_settle_timeout, 0);
+                    a_state = align_state::DONE;
+                }
             }
             break;
         }
@@ -269,13 +296,11 @@ mode::function_results pmsm_ident_mode::run_resistance_stage() {
             float v_cmd = current_pid.update(target_current, filtered_i);
             command_pair_voltage(current_pair, v_cmd);
 
-            // Quiet-phase imbalance diagnostic -- a healthy, balanced motor carries ~0 current on
-            // the undriven phase during a pair test.
-            if(std::fabs(loop_i) > imbalance_min_loop_current &&
-               std::fabs(quiet_i) > imbalance_fraction_threshold * std::fabs(loop_i)) {
-                // report phase-imbalance anomaly (pair = current_pair, quiet_i, loop_i)
-                msg->add(mode_msgs.resistance_phase_sense_imbalance, 0);
-            }
+            // Quiet-phase imbalance is checked once per level using settled/averaged data in
+            // SAMPLE below, not here -- during the ramp the low-pass filter's group delay and
+            // any real per-phase inductance asymmetry can transiently couple current into the
+            // "quiet" phase with no relation to a fault, and this state has no debounce to ride
+            // that out.
 
             if(std::fabs(v_cmd) >= (max_ident_test_voltage - 0.01f)) {
                 saturation_cycle_counter++;
@@ -308,6 +333,7 @@ mode::function_results pmsm_ident_mode::run_resistance_stage() {
                 state_cycle_counter = 0;
                 sample_i_accum = 0.0f;
                 sample_v_accum = 0.0f;
+                sample_quiet_i_accum = 0.0f;
                 sample_accum_count = 0;
                 r_state = resistance_state::SAMPLE;
             }
@@ -319,12 +345,24 @@ mode::function_results pmsm_ident_mode::run_resistance_stage() {
             command_pair_voltage(current_pair, v_cmd);
             sample_i_accum += filtered_i;
             sample_v_accum += v_cmd;
+            sample_quiet_i_accum += quiet_i;
             sample_accum_count++;
             state_cycle_counter++;
             if(state_cycle_counter >= sample_average_cycles) {
                 float avg_i = sample_i_accum / static_cast<float>(sample_accum_count);
                 float avg_v = sample_v_accum / static_cast<float>(sample_accum_count);
+                float avg_quiet_i = sample_quiet_i_accum / static_cast<float>(sample_accum_count);
                 regression.add_sample(avg_i, avg_v); // V = R*I + V_offset -- fit slope = R
+
+                // Quiet-phase imbalance, evaluated once per level using this settled/averaged
+                // window rather than every cycle during the ramp -- a healthy motor carries ~0
+                // current on the undriven phase during a pair test at steady state.
+                if(std::fabs(avg_i) > imbalance_min_loop_current &&
+                   std::fabs(avg_quiet_i) > imbalance_fraction_threshold * std::fabs(avg_i)) {
+                    // report phase-imbalance anomaly (pair = current_pair, avg_quiet_i, avg_i)
+                    msg->add(mode_msgs.resistance_phase_sense_imbalance, 0);
+                }
+
                 state_cycle_counter = 0;
                 r_state = resistance_state::NEXT_LEVEL_OR_POLARITY;
             }
@@ -344,9 +382,12 @@ mode::function_results pmsm_ident_mode::run_resistance_stage() {
                     r_state = resistance_state::RAMP_TO_ZERO;
                 } else {
                     float r_neg_slope = regression.valid() ? regression.slope() : 0.0f;
-                    // report diagnostic if r_pos_slope and r_neg_slope disagree significantly
-                    msg->add(mode_msgs.resistance_slope_mismatch, 0);
-                    pair_results[static_cast<uint8_t>(current_pair)].r_ohms = 0.5f * (r_pos_slope + r_neg_slope);
+                    float r_avg_slope = 0.5f * (r_pos_slope + r_neg_slope);
+                    if(std::fabs(r_avg_slope) > 1e-6f &&
+                       std::fabs(r_pos_slope - r_neg_slope) > resistance_slope_mismatch_fraction_threshold * std::fabs(r_avg_slope)) {
+                        msg->add(mode_msgs.resistance_slope_mismatch, 0);
+                    }
+                    pair_results[static_cast<uint8_t>(current_pair)].r_ohms = r_avg_slope;
                     pair_results[static_cast<uint8_t>(current_pair)].resistance_valid = !pair_timed_out;
                     polarity = 1;
                     regression.reset();
@@ -358,12 +399,35 @@ mode::function_results pmsm_ident_mode::run_resistance_stage() {
         }
         case resistance_state::RAMP_TO_ZERO:
         {
+            // Driving current along a phase-pair axis other than the one ALIGN settled the rotor
+            // on can exert real torque -- ramping back to zero current alone doesn't guarantee
+            // the rotor has stopped moving/ringing before the next level or pair starts, only
+            // that the electrical current has decayed. Require sustained near-zero current on
+            // BOTH loop_i and quiet_i (same technique as ALIGN's MECH_SETTLE) before proceeding,
+            // with a timeout safety net so a persistent oscillation doesn't hang the mode forever.
             float v_cmd = current_pid.update(0.0f, filtered_i);
             command_pair_voltage(current_pair, v_cmd);
             state_cycle_counter++;
-            bool reached_zero = std::fabs(filtered_i) < zero_current_tolerance_amps;
-            bool timed_out = state_cycle_counter >= ramp_to_zero_timeout_cycles;
-            if(reached_zero || timed_out) {
+
+            bool near_zero = std::fabs(filtered_i) < zero_current_tolerance_amps && std::fabs(quiet_i) < zero_current_tolerance_amps;
+            if(near_zero) {
+                resistance_mech_settled_count++;
+            } else {
+                resistance_mech_settled_count = 0;
+            }
+
+            bool settled = resistance_mech_settled_count >= resistance_mech_settle_consecutive_samples;
+            bool timed_out = state_cycle_counter >= resistance_mech_settle_timeout_cycles;
+
+            if(settled || timed_out) {
+                if(timed_out && !settled) {
+                    // Motion/BEMF never confirmed settled between levels -- report and proceed
+                    // anyway rather than hang; a real off-axis-torque-induced oscillation this
+                    // persistent will still show up as noisy samples and likely a slope-mismatch
+                    // or imbalance report from the affected level(s).
+                    msg->add(mode_msgs.resistance_mech_settle_timeout, 0);
+                }
+                resistance_mech_settled_count = 0;
                 state_cycle_counter = 0;
                 if(pair_timed_out || pair_measurement_complete) {
                     r_state = resistance_state::PAIR_DONE;
