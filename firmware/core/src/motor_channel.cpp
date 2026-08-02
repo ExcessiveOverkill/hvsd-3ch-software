@@ -83,6 +83,13 @@ void motor_channel::phase_adc_init() {
             adc->CFGR |= ADC_CFGR_OVRMOD; // enable overrun mode to overwrite old data if not read in time
 
             adc->CFGR2 |= ADC_CFGR2_ROVSE;  // enable oversampling
+
+            // phase current sense sample time
+            uint32_t cycles = 2;
+
+            // phase current sense oversampling
+            uint8_t over_sampling = 2; // 4x oversampling 2^n
+
             // configure_adc_oversampling(adc, 1); // 2x minimum oversampling
             phase_adc_result_left_shift = configure_adc_oversampling(adc, 2);
 
@@ -92,6 +99,8 @@ void motor_channel::phase_adc_init() {
             configure_adc_sample_time(adc, config->phase_v_adc_channel, cycles);
             configure_adc_sample_time(adc, config->phase_w_adc_channel, cycles);
 
+            // 13 cycles for conversion, plus sampling time, multiplied by oversampling factor
+            phase_adc_full_sampling_time_ticks = (cycles + 13) * (1 << over_sampling);
             cycles = 24;
             if(adc == board_hw::phase_u_adc){
                 configure_adc_sample_time(adc, board_hw::vref_half_0_adc_channel, cycles);
@@ -882,9 +891,8 @@ void motor_channel::set_pwm_frequency(float frequency_hz, float* resulting_frequ
     // update ADC trigger compare value to match new frequency
     // ADC should trigger the same number of ticks before the up->down? timer overflow event.
 
-    phase_adc_trigger_offset = 10;    // TODO: calc based on ADC sample/conversion time and oversampling
+    phase_adc_trigger_offset = phase_adc_full_sampling_time_ticks / 2;
 
-    // config->timer->CCR4 = calc_arr - phase_adc_trigger_offset; // ensure offset is within the new ARR range
     config->timer->CCR4 = phase_adc_trigger_offset;
 }
 
@@ -1214,9 +1222,12 @@ float motor_channel::calculate_IPM_IC_thermistor_temp(uint16_t adc_value) {
 }
 
 float motor_channel::calculate_IPM_IC_temp(uint16_t adc_value) {
-    // convert ADC value to temperature in degrees Celsius using a thermistor lookup table or formula
-    // TODO: finish this
-    return static_cast<float>(adc_value);
+    // convert ADC value to temperature in degrees Celsius
+    // 1.5v @ 40C, 3.75v @ 130C linear approximation, 16bit ADC, vref according to board_hw::vref_voltage
+    // TODO: figure out why the ipm voltage is wrong (on the board itself)
+    float voltage = static_cast<float>(adc_value) * (board_hw::vref_voltage / 65535.0f);
+    float temp_c = (voltage - 1.5f) * ((130.0f - 40.0f) / (3.75f - 1.5f)) + 40.0f;
+    return temp_c;
 }
 
 void motor_channel::zero_phase_adcs() {
@@ -1365,6 +1376,32 @@ void motor_channel::apply_basic_deadtime_compensation(int16_t& raw_u, int16_t& r
     }
 }
 
+void motor_channel::enforce_current_sense_duty_limit(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w) {
+    // Phase current is sensed from low-side shunts, with the ADC triggered phase_adc_trigger_
+    // offset ticks from the counter's trough (see set_pwm_frequency()) -- close enough to the
+    // trough that the low side is reliably ON at that instant for essentially any duty except
+    // very close to 100% (raw close to +32767, see voltage_to_raw()). If a phase's commanded
+    // duty pushes its low-side ON window below phase_adc_trigger_offset + board_hw::phase_pwm_
+    // timer_min_low_ticks (trigger point plus settling/bootstrap-recharge margin), the ADC ends
+    // up sampling during high-side conduction instead -- an invalid reading for that phase that
+    // cycle, which can surface as a spurious phase-current-imbalance fault. Clamp the maximum raw
+    // value so the low side always gets at least that much guaranteed on-time first. Only the
+    // near-+32767 extreme is at risk -- near -32768 (low duty), the low side is on for almost the
+    // entire period, well clear of the trough-adjacent trigger point.
+    uint16_t arr = config->timer->ARR;
+    if(arr == 0) return;
+
+    float min_compare_ticks = static_cast<float>(phase_adc_trigger_offset) + static_cast<float>(board_hw::phase_pwm_timer_min_low_ticks);
+    float max_raw = 32768.0f - (65536.0f * min_compare_ticks) / static_cast<float>(arr);
+
+    int16_t* raws[3] = {&raw_u, &raw_v, &raw_w};
+    for(uint8_t i = 0; i < 3; i++){
+        if(static_cast<float>(*raws[i]) > max_raw){
+            *raws[i] = static_cast<int16_t>(max_raw);
+        }
+    }
+}
+
 void motor_channel::enforce_min_pulse_width(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w) {
     // the IPM can't reliably switch a pulse shorter than min_pulse_width_ns. If a phase's raw
     // command is close to, but not exactly at, a rail, snap it to the rail rather than
@@ -1383,7 +1420,8 @@ void motor_channel::enforce_min_pulse_width(int16_t& raw_u, int16_t& raw_v, int1
     }
 }
 
-bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage) {
+bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage,
+                                       float* achieved_u_voltage, float* achieved_v_voltage, float* achieved_w_voltage) {
     // set the phase voltages in volts, relative to an arbitrary common reference - only the
     // relative (line-to-line) voltages matter, a common offset across all 3 phases is fine and
     // is exactly what the SVPWM/discontinuous PWM offset selection below relies on.
@@ -1391,6 +1429,9 @@ bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_volta
     float vbus = get_VBUS_voltage();
     if(vbus <= 0.0f){
         set_scaled_pwm_values(0.0f, 0.0f, 0.0f); // VBUS not valid yet, hold a safe centered output
+        if(achieved_u_voltage) *achieved_u_voltage = 0.0f;
+        if(achieved_v_voltage) *achieved_v_voltage = 0.0f;
+        if(achieved_w_voltage) *achieved_w_voltage = 0.0f;
         return false;
     }
     float v_half = vbus * 0.5f;
@@ -1423,7 +1464,19 @@ bool motor_channel::set_phase_voltage(float phase_u_voltage, float phase_v_volta
         // delay) built from bench test data, which doesn't exist yet.
     }
 
+    // Applied before enforce_min_pulse_width so the (generally larger) current-sense margin is
+    // the one actually satisfied at the high-duty rail -- note this only holds once board_hw::
+    // phase_pwm_timer_min_low_ticks is bench-tuned to a real value; at its current 1-tick
+    // placeholder, enforce_min_pulse_width's own rail-snap may still occasionally win.
+    enforce_current_sense_duty_limit(raw_u, raw_v, raw_w);
     enforce_min_pulse_width(raw_u, raw_v, raw_w);
+
+    // Convert the final (possibly clamped) raw commands back to volts -- the inverse of
+    // voltage_to_raw() -- so callers can see what was actually commanded to the hardware, not
+    // just what they asked for.
+    if(achieved_u_voltage) *achieved_u_voltage = (static_cast<float>(raw_u) / 32767.0f) * v_half;
+    if(achieved_v_voltage) *achieved_v_voltage = (static_cast<float>(raw_v) / 32767.0f) * v_half;
+    if(achieved_w_voltage) *achieved_w_voltage = (static_cast<float>(raw_w) / 32767.0f) * v_half;
 
     set_scaled_pwm_values(static_cast<float>(raw_u) / 32768.0f, static_cast<float>(raw_v) / 32768.0f, static_cast<float>(raw_w) / 32768.0f);
 
@@ -1441,6 +1494,8 @@ uint32_t motor_channel::ns_per_pwm_cycle = 1e9f / board_hw::phase_min_pwm_freque
 float motor_channel::pwm_frequency_hz = board_hw::phase_min_pwm_frequency_hz; // default to minimum frequency
 uint8_t motor_channel::aux_adc_sample_index = 0;
 uint8_t motor_channel::aux_adc_result_left_shift = 0;
+
+uint32_t motor_channel::phase_adc_full_sampling_time_ticks = 0;
 
 float motor_channel::gate_supply_voltage = 0.0f;
 float motor_channel::VBUS_voltage = 0.0f;

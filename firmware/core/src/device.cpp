@@ -267,6 +267,14 @@ void device::run() {
         
         if(adc1_eoc_flag && adc2_eoc_flag && adc3_eoc_flag) {
             // all ADCs have completed a conversion, read the results and clear the flags
+
+            volatile uint32_t tim1_cnt = board_hw::motor_configs[0].timer->CNT;
+            volatile uint32_t tim8_cnt = board_hw::motor_configs[1].timer->CNT;
+            volatile uint32_t tim20_cnt = board_hw::motor_configs[2].timer->CNT;
+
+            volatile uint32_t tim1_status = board_hw::motor_configs[0].timer->SR;
+            volatile uint32_t tim8_status = board_hw::motor_configs[1].timer->SR;
+            volatile uint32_t tim20_status = board_hw::motor_configs[2].timer->SR;
             
             uint8_t phase_adc_sample_index = motor_channel::get_phase_adc_sample_index();
             channel_current_mode_instance[phase_adc_sample_index]->flagged_all_adc_eoc();

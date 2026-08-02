@@ -19,7 +19,14 @@ class motor_channel {
         void start_timer_unsynced();
         void start_timer_synced();
         void set_scaled_pwm_values(float phase_u, float phase_v, float phase_w);
-        bool set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage);
+        // achieved_u/v/w_voltage, if provided, report what was actually commanded to the PWM
+        // hardware after all clamping (VBUS-rail saturation in voltage_to_raw(), enforce_current_
+        // sense_duty_limit(), enforce_min_pulse_width()) -- which can differ from the requested
+        // phase_u/v/w_voltage whenever any of those clamps engage. Callers that need to know the
+        // true applied voltage (e.g. identification routines computing V/I) should use these
+        // rather than assume the request was met exactly.
+        bool set_phase_voltage(float phase_u_voltage, float phase_v_voltage, float phase_w_voltage,
+                                float* achieved_u_voltage = nullptr, float* achieved_v_voltage = nullptr, float* achieved_w_voltage = nullptr);
         void set_pwm_frequency(float frequency_hz, float* resulting_frequency_hz = nullptr, uint16_t* resulting_arr = nullptr);
         void manual_phase_adc_trigger();
         static void manual_aux_adc_trigger();
@@ -49,6 +56,8 @@ class motor_channel {
             phase_w = phase_w_current;
         }
         void zero_phase_adcs();
+
+        void set_basic_deadtime_compensation(bool enabled) { use_basic_deadtime_compensation = enabled; }
 
         bool main_output_enabled() {
             return (config->timer->BDTR & TIM_BDTR_MOE) != 0;
@@ -83,6 +92,8 @@ class motor_channel {
 
         static uint8_t aux_adc_sample_index; // index of the current auxiliary ADC sample in the sequence, shared between all channels since ADCs are synchronized
         static uint8_t aux_adc_result_left_shift; // number of bits to left shift auxiliary ADC result to align with 16-bit full scale after oversampling
+
+        static uint32_t phase_adc_full_sampling_time_ticks; // total sampling time in timer ticks for the phase ADCs
 
         static uint16_t phase_u_vref_offset;
         static uint16_t phase_v_vref_offset;
@@ -138,6 +149,7 @@ class motor_channel {
         bool select_discontinuous_offset(float v_u, float v_v, float v_w, float v_half, float& offset);
         static int16_t voltage_to_raw(float voltage, float v_half);
         void apply_basic_deadtime_compensation(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w);
+        void enforce_current_sense_duty_limit(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w);
         void enforce_min_pulse_width(int16_t& raw_u, int16_t& raw_v, int16_t& raw_w);
         static void reset_analog_watchdogs();
         static bool get_analog_watchdog_status();

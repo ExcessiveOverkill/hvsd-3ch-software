@@ -540,8 +540,16 @@ inline constexpr uint16_t phase_pwm_timer_deadtime_ns = ipms.deadtime_ns;
 inline constexpr uint16_t phase_pwm_timer_deadtime_ticks =
     static_cast<uint16_t>((static_cast<uint64_t>(phase_pwm_timer_deadtime_ns) * TIM1_ker_clk) / 1000000000ULL);
 
-inline constexpr uint32_t phase_pwm_timer_min_low_ticks = 1u; // minimum low time for PWM timer to allow sampling and gate drive, in timer ticks
-inline constexpr uint32_t phase_pwm_timer_max_high_ticks = 1u; // maximum high time for PWM timer before gate drive voltage drops, in timer ticks
+// Minimum guaranteed low-side ON time, in timer ticks beyond the ADC's own trigger point, for the
+// current-sense amplifier to settle and for low-side gate-drive bootstrap recharge. Wired into
+// motor_channel::enforce_current_sense_duty_limit() (added 2026-08 after a phase-current-imbalance
+// fault traced to high-duty commands leaving too little low-side ON time before the ADC trigger).
+// TODO: bench tune -- this placeholder of 1 tick provides essentially no real protection; needs a
+// real value based on the current-sense amplifier's settling time, and should end up comparable to
+// or larger than min_pulse_width_ns's tick-equivalent (phase_pwm_min_usable_ticks below), or
+// enforce_min_pulse_width's own rail-snapping may still occasionally override this clamp.
+inline constexpr uint32_t phase_pwm_timer_min_low_ticks = 100u; // just a guess for now  
+inline constexpr uint32_t phase_pwm_timer_max_high_ticks = 1u; // maximum high time for PWM timer before gate drive voltage drops, in timer ticks -- currently unused, see phase_pwm_timer_min_low_ticks
 inline constexpr uint16_t phase_pwm_min_usable_ticks = 
     static_cast<uint16_t>((static_cast<uint64_t>(ipms.min_pulse_width_ns) * TIM1_ker_clk) / 1000000000ULL);
 
