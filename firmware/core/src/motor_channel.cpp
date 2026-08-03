@@ -94,7 +94,6 @@ void motor_channel::phase_adc_init() {
             phase_adc_result_left_shift = configure_adc_oversampling(adc, 2);
 
             // phase current channels are configured per-motor below so all ranks get explicit sample times
-            uint32_t cycles = 2;
             configure_adc_sample_time(adc, config->phase_u_adc_channel, cycles);
             configure_adc_sample_time(adc, config->phase_v_adc_channel, cycles);
             configure_adc_sample_time(adc, config->phase_w_adc_channel, cycles);

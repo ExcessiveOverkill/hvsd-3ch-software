@@ -105,6 +105,30 @@ class linear_regression {
         uint32_t n = 0;
 };
 
+struct current_loop_gains {
+    float kp;
+    float ki;
+};
+
+// Computes PI current-loop gains via pole-zero cancellation: wc = 2*pi*(pwm_frequency_hz /
+// current_loop_bandwidth_divisor), Kp = wc*l_henries, Ki = wc*r_ohms.
+//
+// Deliberately conservative rather than the most aggressive stable bandwidth: identified L is
+// documented elsewhere as "apparent loop inductance," not a validated per-phase value -- it can
+// be biased high OR low by uncancelled mutual coupling, direction unknown. Real hardware also
+// has ~1 PWM cycle of measurement delay the ideal continuous-time model doesn't capture. Backing
+// off bandwidth is the only sound response to a direction-unknown error.
+//
+// If r_ohms/l_henries are non-finite (e.g. NaN from failed identification) or fall outside
+// [r_min_ohms, r_max_ohms] / [l_min_henries, l_max_henries], or pwm_frequency_hz <= 0, returns a
+// hardcoded conservative fallback instead of computing from bad data. Default bounds are loose;
+// callers with tighter domain knowledge (e.g. a specific ident routine's own plausibility
+// bounds) can pass narrower ones.
+current_loop_gains compute_current_loop_gains(
+    float r_ohms, float l_henries, float pwm_frequency_hz,
+    float r_min_ohms = 1e-3f, float r_max_ohms = 100.0f,
+    float l_min_henries = 1e-6f, float l_max_henries = 1.0f);
+
 // Stateless Clarke/Park transforms for field-oriented control. sin_theta/cos_theta are
 // expected to come from cordic::sin_cos(wrap_angle(theta), ...) - kept as explicit
 // parameters here so this file has no dependency on the CORDIC peripheral.

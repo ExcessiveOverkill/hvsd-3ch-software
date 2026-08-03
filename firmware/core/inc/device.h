@@ -18,6 +18,7 @@
 
 #include "mode.h"
 #include "pmsm_ident_mode.h"
+#include "sine_wiggle_mode.h"
 
 
 class device {
@@ -64,6 +65,7 @@ private:
     struct mode_options {
         mode none;
         pmsm_ident_mode pmsm_ident;
+        sine_wiggle_mode sine_wiggle;
     };
 
     static mode_options channel_modes[3];

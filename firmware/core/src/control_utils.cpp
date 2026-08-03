@@ -101,6 +101,41 @@ float linear_regression::intercept() const {
     return static_cast<float>((sum_y - static_cast<double>(slope()) * sum_x) / static_cast<double>(n));
 }
 
+namespace {
+    // Conservative bandwidth denominator: bandwidth_hz = pwm_frequency_hz / this. Common FOC
+    // guidance targets pwm/10; doubling to pwm/20 buys margin against the one-PWM-cycle
+    // measurement delay and unknown-direction identified-L bias -- roughly halves the
+    // phase-margin erosion from either source. TODO: bench tune once a real closed-loop current
+    // controller exists to consume this.
+    constexpr float current_loop_bandwidth_divisor = 20.0f;
+
+    // Hand-picked low-bandwidth gains, chosen to stay stable across a wide range of small
+    // BLDC/PMSM motors -- used only when the caller's R/L can't be trusted. Not tuned for
+    // performance, only as a safe last resort. TODO: bench tune.
+    constexpr float current_loop_fallback_kp = 0.5f;
+    constexpr float current_loop_fallback_ki = 20.0f;
+
+    static_assert(current_loop_fallback_kp > 0.0f && current_loop_fallback_ki > 0.0f,
+                  "fallback current-loop gains must be positive to be stabilizing");
+}
+
+current_loop_gains compute_current_loop_gains(
+    float r_ohms, float l_henries, float pwm_frequency_hz,
+    float r_min_ohms, float r_max_ohms, float l_min_henries, float l_max_henries) {
+
+    bool r_valid = std::isfinite(r_ohms) && r_ohms >= r_min_ohms && r_ohms <= r_max_ohms;
+    bool l_valid = std::isfinite(l_henries) && l_henries >= l_min_henries && l_henries <= l_max_henries;
+
+    if(!r_valid || !l_valid || pwm_frequency_hz <= 0.0f) {
+        return current_loop_gains{current_loop_fallback_kp, current_loop_fallback_ki};
+    }
+
+    constexpr float two_pi = 6.28318530717958647692f;
+    float wc = two_pi * (pwm_frequency_hz / current_loop_bandwidth_divisor);
+
+    return current_loop_gains{wc * l_henries, wc * r_ohms};
+}
+
 namespace foc {
 
 alpha_beta clarke(three_phase abc) {

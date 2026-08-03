@@ -17,13 +17,16 @@ motor_channel device::motor_channels[3] = {
 
 device::mode_options device::channel_modes[3] = {
         { .none = mode(&device::motor_channels[0], &msg, &time),
-          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[0], &msg, &time)
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[0], &msg, &time),
+          .sine_wiggle = sine_wiggle_mode(&device::motor_channels[0], &msg, &time, &cordic_drv)
         },
         { .none = mode(&device::motor_channels[1], &msg, &time),
-          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[1], &msg, &time)
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[1], &msg, &time),
+          .sine_wiggle = sine_wiggle_mode(&device::motor_channels[1], &msg, &time, &cordic_drv)
         },
         { .none = mode(&device::motor_channels[2], &msg, &time),
-          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[2], &msg, &time)
+          .pmsm_ident = pmsm_ident_mode(&device::motor_channels[2], &msg, &time),
+          .sine_wiggle = sine_wiggle_mode(&device::motor_channels[2], &msg, &time, &cordic_drv)
         }
 };
 
@@ -189,12 +192,13 @@ void device::init() {
         // init all modes
         channel_modes[i].none.init();
         channel_modes[i].pmsm_ident.init();
+        channel_modes[i].sine_wiggle.init();
         // other modes can be added here in the future
 
 
         channel_current_mode_instance[i] = &channel_modes[i].none;  // set to default mode
-        
-        channel_current_mode_instance[i] = &channel_modes[i].pmsm_ident;  // for testing
+
+        channel_current_mode_instance[i] = &channel_modes[i].sine_wiggle;  // for testing
         
         motor_channels[i].init();
 
